@@ -186,12 +186,19 @@
       } catch (e) {}
     }
     try {
+      // 采集器把网易云封面(国内可加载)塞进了 additional_info.cover_url；优先用它，
+      // 苹果 mzstatic 在国内已无 CDN 节点、加载不出。
+      const fromLB = (l, playing, listenedAt) => {
+        const m = l.track_metadata || {};
+        const cover = (m.additional_info && m.additional_info.cover_url) || '';
+        return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt, artwork: cover };
+      };
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
-      if (now) { const m = now.track_metadata || {}; return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing: true, listenedAt: null }; }
+      if (now) return fromLB(now, true, null);
       const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`)).json();
       const last = re.payload && re.payload.listens && re.payload.listens[0];
-      if (last) { const m = last.track_metadata || {}; return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing: false, listenedAt: last.listened_at }; }
+      if (last) return fromLB(last, false, last.listened_at);
       return { empty: true };
     } catch (e) { return null; }
   }
