@@ -132,38 +132,37 @@
     return `${Math.floor(d / 86400)} 天前`;
   }
 
-  let curKey = '';
-  async function render(track, live, listenedAt) {
-    const meta = track.track_metadata || {};
-    const title = meta.track_name || '未知曲目';
-    const artist = meta.artist_name || '';
-    const album = meta.release_name || '';
+  // 统一状态：{title, artist, album, playing, listenedAt, artwork}
+  const LAST_KEY = 'np:last';
+  function persist(s) { try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch (e) {} }
+  function loadPersisted() { try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { return null; } }
 
-    el('status').classList.toggle('live', live);
-    el('status-text').textContent = live ? '正在播放' : (listenedAt ? `上次播放 · ${relTime(listenedAt)}` : '最近播放');
+  let curKey = '';
+  async function paint(s) {
+    const title = s.title || '未知曲目';
+    const artist = s.artist || '';
+    el('status').classList.toggle('live', !!s.playing);
+    el('status-text').textContent = s.playing ? '正在播放' : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
     el('title').textContent = title;
     el('artist').textContent = artist;
-    el('album').textContent = album;
-    document.title = live ? `♪ ${title} - ${artist}` : '正在听什么 ♪';
+    el('album').textContent = s.album || '';
+    document.title = s.playing ? `♪ ${title} - ${artist}` : '正在听什么 ♪';
 
     const key = `${artist}|${title}`;
-    if (key === curKey) return;
+    const sameTrack = key === curKey;
     curKey = key;
-    const art = el('art');
-    art.style.opacity = .3;
-    const url = await artworkFor(artist, title);
-    if (key !== curKey) return; // a newer track took over meanwhile
-    if (url) {
-      art.src = url;
-      el('bg').style.backgroundImage = `url("${url}")`;
-    } else {
-      art.removeAttribute('src');
-      el('bg').style.backgroundImage = '';
+    let art = s.artwork || '';
+    if (!sameTrack) {
+      const imgEl = el('art');
+      if (!art) { imgEl.style.opacity = .3; art = await artworkFor(artist, title); if (key !== curKey) return; }
+      if (art) { imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`; }
+      else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
+      imgEl.style.opacity = 1;
     }
-    art.style.opacity = 1;
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art });
   }
 
-  function renderIdle(msg) {
+  function paintIdle(msg) {
     el('status').classList.remove('live');
     el('status-text').textContent = '暂无播放';
     el('title').textContent = '这会儿很安静';
@@ -171,57 +170,55 @@
     el('album').textContent = '';
   }
 
-  // EdgeOne 合成 JSON 路径：封面已由服务端查好，直接用，不再客户端查 iTunes。
-  async function renderFlat(d) {
-    const title = d.title || '未知曲目';
-    const artist = d.artist || '';
-    el('status').classList.toggle('live', !!d.playing);
-    el('status-text').textContent = d.playing ? '正在播放' : (d.listenedAt ? `上次播放 · ${relTime(d.listenedAt)}` : '最近播放');
-    el('title').textContent = title;
-    el('artist').textContent = artist;
-    el('album').textContent = d.album || '';
-    document.title = d.playing ? `♪ ${title} - ${artist}` : '正在听什么 ♪';
-    const key = `${artist}|${title}`;
-    if (key === curKey) return;
-    curKey = key;
-    const art = el('art');
-    if (d.artwork) { art.src = d.artwork; el('bg').style.backgroundImage = `url("${d.artwork}")`; }
-    else { art.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
-    art.style.opacity = 1;
-  }
-
-  // 优先走 EdgeOne /now；返回 true 表示已渲染。任何失败(如国内对免备案区返回 401、
-  // 网络错误)都返回 false，交给直连 LB 兜底。
-  async function tickViaApi() {
-    try {
-      const r = await fetch(`${API_BASE}/now`);
-      if (!r.ok) return false;
-      const d = await r.json();
-      if (d && d.ok && !d.empty && d.title) { await renderFlat(d); return true; }
-      if (d && (d.empty || d.ok)) { renderIdle('还没有任何收听记录'); return true; }
-      return false;
-    } catch (e) { return false; }
-  }
-
-  async function tick() {
-    if (USER === 'CHANGE_ME') { renderIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
-    if (API_BASE && await tickViaApi()) return; // EdgeOne 拿到就用，拿不到回退 LB
+  // 取一次状态：优先 EdgeOne /now（海外快），失败/国内401则回退直连 LB。
+  // 返回 状态对象 / {empty:true} / null(彻底失败，此时不要清屏，保留上一首)。
+  async function fetchState() {
+    if (API_BASE) {
+      try {
+        const r = await fetch(`${API_BASE}/now`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.ok && !d.empty && d.title) {
+            return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork };
+          }
+          if (d && d.empty) return { empty: true };
+        }
+      } catch (e) {}
+    }
     try {
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
-      const nowListen = pn.payload && pn.payload.listens && pn.payload.listens[0];
-      if (nowListen) { await render(nowListen, true); return; }
+      const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
+      if (now) { const m = now.track_metadata || {}; return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing: true, listenedAt: null }; }
       const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`)).json();
       const last = re.payload && re.payload.listens && re.payload.listens[0];
-      if (last) { await render(last, false, last.listened_at); return; }
-      renderIdle('还没有任何收听记录');
-    } catch (e) {
-      renderIdle('数据加载失败，稍后自动重试');
-    }
+      if (last) { const m = last.track_metadata || {}; return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing: false, listenedAt: last.listened_at }; }
+      return { empty: true };
+    } catch (e) { return null; }
   }
+
+  let everRendered = false;
+  async function tick() {
+    if (USER === 'CHANGE_ME') { paintIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
+    const s = await fetchState();
+    if (s && !s.empty) { await paint(s); everRendered = true; return; }
+    if (s && s.empty) { if (!everRendered) paintIdle('还没有任何收听记录'); return; }
+    // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏。
+    if (!everRendered) paintIdle('连接中…稍后自动重试');
+  }
+
+  // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。
+  const persisted = loadPersisted();
+  if (persisted && persisted.title) { everRendered = true; paint(persisted); }
+  else { paintIdle('连接中…'); }
 
   tick();
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+
+  // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 })();
 </script>
 </body>
