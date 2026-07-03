@@ -70,6 +70,17 @@
   }
   .artist { font-size: 16px; color: #c8cdd6; margin-bottom: 4px; overflow-wrap: anywhere; }
   .album { font-size: 13px; color: #8a91a0; overflow-wrap: anywhere; }
+  .progress { width: 100%; margin-top: 22px; display: none; }
+  .progress.show { display: block; }
+  .bar { position: relative; height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
+  .bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    border-radius: 999px; background: #f5f6f8;
+  }
+  .times {
+    display: flex; justify-content: space-between; margin-top: 8px;
+    font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
+  }
   .meta { margin-top: 22px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -89,6 +100,10 @@
   <h1 id="title">…</h1>
   <div id="artist" class="artist"></div>
   <div id="album" class="album"></div>
+  <div id="progress" class="progress">
+    <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
+    <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
+  </div>
   <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
 </main>
 <script>
@@ -141,8 +156,13 @@
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
-    el('status').classList.toggle('live', !!s.playing);
-    el('status-text').textContent = s.playing ? '正在播放' : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
+    // rate=0 → 当前曲目但暂停；rate>0/未知 → 播放中。
+    const live = !!s.playing && s.rate !== 0;
+    const paused = !!s.playing && s.rate === 0;
+    el('status').classList.toggle('live', live);
+    el('status-text').textContent = live ? '正在播放'
+      : paused ? '已暂停'
+      : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
     el('title').textContent = title;
     el('artist').textContent = artist;
     el('album').textContent = s.album || '';
@@ -168,7 +188,48 @@
     el('title').textContent = '这会儿很安静';
     el('artist').textContent = msg || '';
     el('album').textContent = '';
+    setProgress(null);
   }
+
+  // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
+  // 但 progressMs + (now - progressTs) * rate 恒等于当前位置）；rate=0(暂停)冻结。
+  // 只在“当前曲目”(playing-now 返回且含时长)时显示，“上次播放”不显示。
+  let pb = null;
+  function setProgress(s) {
+    if (s && s.playing && s.durationMs > 0 && typeof s.progressTs === 'number') {
+      pb = {
+        durationMs: s.durationMs,
+        progressMs: s.progressMs || 0,
+        progressTs: s.progressTs,
+        rate: (s.rate == null ? 1 : s.rate),
+      };
+      el('progress').classList.add('show');
+    } else {
+      pb = null;
+      el('progress').classList.remove('show');
+    }
+  }
+  function fmtTime(ms) {
+    const t = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+  }
+  let lastSec = -1;
+  function frame() {
+    if (pb) {
+      let pos = pb.progressMs;
+      if (pb.rate > 0) pos += (Date.now() - pb.progressTs) * pb.rate;
+      pos = Math.max(0, Math.min(pb.durationMs, pos));
+      el('bar-fill').style.width = (pb.durationMs > 0 ? (pos / pb.durationMs) * 100 : 0) + '%';
+      const sec = Math.floor(pos / 1000);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        el('t-cur').textContent = fmtTime(pos);
+        el('t-dur').textContent = fmtTime(pb.durationMs);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 
   // 取一次状态：优先 EdgeOne /now（海外快），失败/国内401则回退直连 LB。
   // 返回 状态对象 / {empty:true} / null(彻底失败，此时不要清屏，保留上一首)。
@@ -179,7 +240,8 @@
         if (r.ok) {
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
-            return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork };
+            return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
+              durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate };
           }
           if (d && d.empty) return { empty: true };
         }
@@ -190,8 +252,11 @@
       // 苹果 mzstatic 在国内已无 CDN 节点、加载不出。
       const fromLB = (l, playing, listenedAt) => {
         const m = l.track_metadata || {};
-        const cover = (m.additional_info && m.additional_info.cover_url) || '';
-        return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt, artwork: cover };
+        const ai = m.additional_info || {};
+        const num = v => (typeof v === 'number' ? v : null);
+        return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
+          artwork: ai.cover_url || '',
+          durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
@@ -207,8 +272,8 @@
   async function tick() {
     if (USER === 'CHANGE_ME') { paintIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
     const s = await fetchState();
-    if (s && !s.empty) { await paint(s); everRendered = true; return; }
-    if (s && s.empty) { if (!everRendered) paintIdle('还没有任何收听记录'); return; }
+    if (s && !s.empty) { await paint(s); setProgress(s); everRendered = true; return; }
+    if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); return; }
     // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏。
     if (!everRendered) paintIdle('连接中…稍后自动重试');
   }
