@@ -1,10 +1,15 @@
 // 缓存页面壳，让重复访问秒开（首屏仍需一次网络）。
 // 策略：same-origin GET 用 stale-while-revalidate —— 命中缓存立刻返回，
 // 后台顺便拉最新更新缓存。跨域的数据/图片请求(LB、EdgeOne、iTunes、mzstatic)不拦，走网络。
-const CACHE = 'np-shell-v1';
+const CACHE = 'np-shell-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  // 删除旧版本缓存，确保升级后立即拿到新页面壳（进度条等）。
+  const names = await caches.keys();
+  await Promise.all(names.filter((n) => n !== CACHE).map((n) => caches.delete(n)));
+  await self.clients.claim();
+})()));
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
