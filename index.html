@@ -97,6 +97,9 @@
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
   const POLL_MS = 10000;
+  // 国内加速中转（EdgeOne /now）。默认走腾讯云 EdgeOne 港区节点；?api= 可覆盖，
+  // 设成 ?api= 空串可强制回退浏览器直连 ListenBrainz。
+  const API_BASE = params.has('api') ? params.get('api') : 'https://nowplaying-gxrbezuy.edgeone.dev';
 
   const el = id => document.getElementById(id);
   el('lb-link').href = `https://listenbrainz.org/user/${encodeURIComponent(USER)}/`;
@@ -168,9 +171,35 @@
     el('album').textContent = '';
   }
 
+  // EdgeOne 合成 JSON 路径：封面已由服务端查好，直接用，不再客户端查 iTunes。
+  async function renderFlat(d) {
+    const title = d.title || '未知曲目';
+    const artist = d.artist || '';
+    el('status').classList.toggle('live', !!d.playing);
+    el('status-text').textContent = d.playing ? '正在播放' : (d.listenedAt ? `上次播放 · ${relTime(d.listenedAt)}` : '最近播放');
+    el('title').textContent = title;
+    el('artist').textContent = artist;
+    el('album').textContent = d.album || '';
+    document.title = d.playing ? `♪ ${title} - ${artist}` : '正在听什么 ♪';
+    const key = `${artist}|${title}`;
+    if (key === curKey) return;
+    curKey = key;
+    const art = el('art');
+    if (d.artwork) { art.src = d.artwork; el('bg').style.backgroundImage = `url("${d.artwork}")`; }
+    else { art.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
+    art.style.opacity = 1;
+  }
+
+  async function tickViaApi() {
+    const d = await (await fetch(`${API_BASE}/now`)).json();
+    if (d && d.ok && !d.empty && d.title) { await renderFlat(d); return; }
+    renderIdle('还没有任何收听记录');
+  }
+
   async function tick() {
     if (USER === 'CHANGE_ME') { renderIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
     try {
+      if (API_BASE) { await tickViaApi(); return; }
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
       const nowListen = pn.payload && pn.payload.listens && pn.payload.listens[0];
       if (nowListen) { await render(nowListen, true); return; }
