@@ -190,16 +190,23 @@
     art.style.opacity = 1;
   }
 
+  // 优先走 EdgeOne /now；返回 true 表示已渲染。任何失败(如国内对免备案区返回 401、
+  // 网络错误)都返回 false，交给直连 LB 兜底。
   async function tickViaApi() {
-    const d = await (await fetch(`${API_BASE}/now`)).json();
-    if (d && d.ok && !d.empty && d.title) { await renderFlat(d); return; }
-    renderIdle('还没有任何收听记录');
+    try {
+      const r = await fetch(`${API_BASE}/now`);
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (d && d.ok && !d.empty && d.title) { await renderFlat(d); return true; }
+      if (d && (d.empty || d.ok)) { renderIdle('还没有任何收听记录'); return true; }
+      return false;
+    } catch (e) { return false; }
   }
 
   async function tick() {
     if (USER === 'CHANGE_ME') { renderIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
+    if (API_BASE && await tickViaApi()) return; // EdgeOne 拿到就用，拿不到回退 LB
     try {
-      if (API_BASE) { await tickViaApi(); return; }
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
       const nowListen = pn.payload && pn.payload.listens && pn.payload.listens[0];
       if (nowListen) { await render(nowListen, true); return; }
