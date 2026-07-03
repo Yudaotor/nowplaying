@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>正在听什么 ♪</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #0d0f14;
+    color: #f5f6f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  #bg {
+    position: absolute; inset: -60px;
+    background-size: cover; background-position: center;
+    filter: blur(60px) saturate(1.6) brightness(0.45);
+    transition: background-image .8s ease;
+    z-index: 0;
+  }
+  .card {
+    position: relative; z-index: 1;
+    width: min(92vw, 380px);
+    padding: 36px 28px 32px;
+    border-radius: 28px;
+    background: rgba(22, 25, 33, .58);
+    backdrop-filter: blur(30px) saturate(1.4);
+    -webkit-backdrop-filter: blur(30px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 24px 80px rgba(0,0,0,.55);
+    text-align: center;
+  }
+  .art-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 26px; }
+  .art {
+    width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
+    box-shadow: 0 16px 48px rgba(0,0,0,.6);
+    background: linear-gradient(135deg, #2b2f3a, #1a1d26);
+    transition: opacity .5s ease;
+  }
+  .art.placeholder { display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: .85; }
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; letter-spacing: .4px;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 18px;
+    background: rgba(255,255,255,.08); color: #9aa3b2;
+  }
+  .status.live { background: rgba(48, 209, 88, .16); color: #30d158; }
+  .eq { display: none; align-items: flex-end; gap: 2px; height: 12px; }
+  .status.live .eq { display: inline-flex; }
+  .eq span {
+    width: 3px; border-radius: 1px; background: #30d158;
+    animation: eq 1s ease-in-out infinite;
+  }
+  .eq span:nth-child(1) { height: 60%; animation-delay: -.4s; }
+  .eq span:nth-child(2) { height: 100%; animation-delay: -.2s; }
+  .eq span:nth-child(3) { height: 45%; animation-delay: 0s; }
+  @keyframes eq { 0%,100% { transform: scaleY(.4);} 50% { transform: scaleY(1);} }
+  h1 {
+    font-size: 22px; font-weight: 700; line-height: 1.35; margin-bottom: 8px;
+    overflow-wrap: anywhere;
+  }
+  .artist { font-size: 16px; color: #c8cdd6; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .album { font-size: 13px; color: #8a91a0; overflow-wrap: anywhere; }
+  .meta { margin-top: 22px; font-size: 12px; color: #6b7280; }
+  .meta a { color: #8a91a0; text-decoration: none; }
+  .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<main class="card">
+  <div class="art-wrap">
+    <img id="art" class="art" alt="" referrerpolicy="no-referrer">
+  </div>
+  <div id="status" class="status">
+    <span class="eq"><span></span><span></span><span></span></span>
+    <span id="status-text">加载中…</span>
+  </div>
+  <h1 id="title">…</h1>
+  <div id="artist" class="artist"></div>
+  <div id="album" class="album"></div>
+  <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
+</main>
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const USER = params.get('user') || 'CHANGE_ME';
+  const LB = 'https://api.listenbrainz.org';
+  const POLL_MS = 10000;
+
+  const el = id => document.getElementById(id);
+  el('lb-link').href = `https://listenbrainz.org/user/${encodeURIComponent(USER)}/`;
+
+  const artCache = new Map();
+  async function artworkFor(artist, title) {
+    const key = `art:${artist}|${title}`;
+    if (artCache.has(key)) return artCache.get(key);
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) { artCache.set(key, cached); return cached; }
+    } catch (e) {}
+    try {
+      const q = encodeURIComponent(`${artist} ${title}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+      const data = await res.json();
+      const url100 = data.results && data.results[0] && data.results[0].artworkUrl100;
+      const url = url100 ? url100.replace('100x100bb', '600x600bb') : '';
+      artCache.set(key, url);
+      try { if (url) localStorage.setItem(key, url); } catch (e) {}
+      return url;
+    } catch (e) { return ''; }
+  }
+
+  function relTime(unixSecs) {
+    const d = Math.max(0, Math.floor(Date.now() / 1000 - unixSecs));
+    if (d < 60) return '刚刚';
+    if (d < 3600) return `${Math.floor(d / 60)} 分钟前`;
+    if (d < 86400) return `${Math.floor(d / 3600)} 小时前`;
+    return `${Math.floor(d / 86400)} 天前`;
+  }
+
+  let curKey = '';
+  async function render(track, live, listenedAt) {
+    const meta = track.track_metadata || {};
+    const title = meta.track_name || '未知曲目';
+    const artist = meta.artist_name || '';
+    const album = meta.release_name || '';
+
+    el('status').classList.toggle('live', live);
+    el('status-text').textContent = live ? '正在播放' : (listenedAt ? `上次播放 · ${relTime(listenedAt)}` : '最近播放');
+    el('title').textContent = title;
+    el('artist').textContent = artist;
+    el('album').textContent = album;
+    document.title = live ? `♪ ${title} - ${artist}` : '正在听什么 ♪';
+
+    const key = `${artist}|${title}`;
+    if (key === curKey) return;
+    curKey = key;
+    const art = el('art');
+    art.style.opacity = .3;
+    const url = await artworkFor(artist, title);
+    if (key !== curKey) return; // a newer track took over meanwhile
+    if (url) {
+      art.src = url;
+      el('bg').style.backgroundImage = `url("${url}")`;
+    } else {
+      art.removeAttribute('src');
+      el('bg').style.backgroundImage = '';
+    }
+    art.style.opacity = 1;
+  }
+
+  function renderIdle(msg) {
+    el('status').classList.remove('live');
+    el('status-text').textContent = '暂无播放';
+    el('title').textContent = '这会儿很安静';
+    el('artist').textContent = msg || '';
+    el('album').textContent = '';
+  }
+
+  async function tick() {
+    if (USER === 'CHANGE_ME') { renderIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
+    try {
+      const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
+      const nowListen = pn.payload && pn.payload.listens && pn.payload.listens[0];
+      if (nowListen) { await render(nowListen, true); return; }
+      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`)).json();
+      const last = re.payload && re.payload.listens && re.payload.listens[0];
+      if (last) { await render(last, false, last.listened_at); return; }
+      renderIdle('还没有任何收听记录');
+    } catch (e) {
+      renderIdle('数据加载失败，稍后自动重试');
+    }
+  }
+
+  tick();
+  setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+})();
+</script>
+</body>
+</html>
