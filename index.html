@@ -125,9 +125,16 @@
             mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
   .lyrics.show { display: block; }
   .lyrics-inner { transition: transform .45s cubic-bezier(.22,.61,.36,1); will-change: transform; }
-  .lrc-line { min-height: 26px; line-height: 1.35; padding: 3px 0; font-size: 14px;
-    color: #7b8290; transition: color .3s ease, opacity .3s ease; opacity: .6; overflow-wrap: anywhere; }
-  .lrc-line.active { color: var(--accent, #f0f2f5); opacity: 1; font-weight: 700; }
+  /* 每个歌词行可含三小行：罗马音(上)/原文(中)/翻译(下)。原文可逐字(yrc)或整行高亮。 */
+  .lrc-line { padding: 6px 0; transition: opacity .3s ease; opacity: .5; overflow-wrap: anywhere; }
+  .lrc-line.active { opacity: 1; }
+  .lrc-roma { font-size: 11px; line-height: 1.25; color: #838a97; margin-bottom: 1px; }
+  .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
+  .lrc-line.active .lrc-main { color: var(--accent, #f2f4f7); } /* 行级高亮(无逐字时) */
+  .lrc-tr { font-size: 12px; line-height: 1.25; color: #838a97; margin-top: 1px; font-weight: 400; }
+  .lrc-w { color: #7f8794; transition: color .18s ease; }       /* 逐字:未唱 */
+  .lrc-line.active .lrc-w { color: #aab0bc; }                    /* 当前行未唱 */
+  .lrc-line.active .lrc-w.sung { color: var(--accent, #fff); }   /* 已唱 */
   @media (prefers-reduced-motion: reduce) { .lyrics-inner { transition: none; } }
   .links {
     display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
@@ -290,7 +297,7 @@
     }
     setLinks(s.links || {});
     setAccent(s.accent);
-    setLyrics(s.lyrics || '', !!s.playing, sameTrack);
+    setLyrics(s, !!s.playing, sameTrack);
     persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '' });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
@@ -366,15 +373,16 @@
     el('artist').textContent = msg || '';
     el('album').textContent = '';
     setProgress(null);
-    setLyrics('', false, false);
+    setLyrics(null, false, false);
     setLinks({});
     setAccent('');
     setStale(false);
   }
 
-  // ---- 同步歌词(LRC)----:采集器把网易云带时间轴歌词塞进 additional_info.lyrics，
-  // 这里解析成 [{t,el}]，在进度条 rAF 里按外推位置高亮当前行、整体位移滚到中间。
-  let lrcLines = [];   // [{t: ms, el}]
+  // ---- 同步歌词 ----:采集器把网易云的 原文/翻译/罗马音(逐行 LRC)+ 逐字(yrc)塞进
+  // additional_info；这里合并成多行 DOM(罗马音上/原文中/翻译下)，在进度条 rAF 里按外推
+  // 位置高亮当前行、有逐字则逐字点亮，并整体位移把当前行滚到中间。
+  let lrcLines = [];   // [{t, el, words:[{t,el}]|null}]
   let lrcActive = -1;
   function parseLRC(text) {
     const out = [];
@@ -391,16 +399,48 @@
     }
     return out.sort((a, b) => a.t - b.t);
   }
-  function setLyrics(text, playing, sameTrack) {
+  // 网易云 yrc 逐字：每行 [行始ms,行长ms] 后跟若干 (词始ms,词长ms,0)文字
+  function parseYRC(text) {
+    const out = [];
+    for (const raw of (text || '').split('\n')) {
+      const head = raw.match(/^\[(\d+),\d+\]/);
+      if (!head) continue;
+      const words = [];
+      const re = /\((\d+),(\d+),\d+\)([^(]*)/g;
+      let m;
+      while ((m = re.exec(raw))) { if (m[3] !== '') words.push({ t: +m[1], text: m[3] }); }
+      if (words.length) out.push({ t: +head[1], words });
+    }
+    return out.sort((a, b) => a.t - b.t);
+  }
+  // 在有序 [{t,text}] 里找与 t 最接近(容差内)的文本，把翻译/罗马音贴到对应原文行。
+  function nearestText(arr, t, tol) {
+    let best = '', bestD = tol;
+    for (const it of arr) { const d = Math.abs(it.t - t); if (d <= bestD) { bestD = d; best = it.text; } }
+    return best;
+  }
+  function setLyrics(s, playing, sameTrack) {
     const wrap = el('lyrics'), inner = el('lyrics-inner');
     let show = false;
-    if (playing) { // 只在播放时显示(才可同步)
+    if (playing && s) { // 只在播放时显示(才可同步)
       if (!sameTrack || !lrcLines.length) {
-        const parsed = parseLRC(text);
+        const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
+        const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
         inner.textContent = ''; lrcActive = -1; inner.style.transform = 'translateY(0)';
-        lrcLines = parsed.map(p => {
-          const d = document.createElement('div'); d.className = 'lrc-line'; d.textContent = p.text;
-          inner.appendChild(d); return { t: p.t, el: d };
+        lrcLines = base.map(ln => {
+          const line = document.createElement('div'); line.className = 'lrc-line';
+          const rm = nearestText(roma, ln.t, 700);
+          if (rm) { const d = document.createElement('div'); d.className = 'lrc-roma'; d.textContent = rm; line.appendChild(d); }
+          const main = document.createElement('div'); main.className = 'lrc-main';
+          let words = null;
+          if (ln.words) {
+            words = ln.words.map(w => { const sp = document.createElement('span'); sp.className = 'lrc-w'; sp.textContent = w.text; main.appendChild(sp); return { t: w.t, el: sp }; });
+          } else { main.textContent = ln.text; }
+          line.appendChild(main);
+          const tt = nearestText(tr, ln.t, 700);
+          if (tt) { const d = document.createElement('div'); d.className = 'lrc-tr'; d.textContent = tt; line.appendChild(d); }
+          inner.appendChild(line);
+          return { t: ln.t, el: line, words };
         });
       }
       show = lrcLines.length > 0;
@@ -417,14 +457,21 @@
     if (!lrcLines.length) return;
     let idx = -1;
     for (let i = 0; i < lrcLines.length && lrcLines[i].t <= posMs; i++) idx = i;
-    if (idx === lrcActive) return;
-    if (lrcActive >= 0) lrcLines[lrcActive].el.classList.remove('active');
-    lrcActive = idx;
-    if (idx < 0) { el('lyrics-inner').style.transform = 'translateY(0)'; return; }
-    const a = lrcLines[idx].el, box = el('lyrics');
-    a.classList.add('active');
-    const y = a.offsetTop + a.clientHeight / 2 - box.clientHeight / 2;
-    el('lyrics-inner').style.transform = `translateY(${-Math.max(0, y)}px)`;
+    if (idx !== lrcActive) {
+      if (lrcActive >= 0) lrcLines[lrcActive].el.classList.remove('active');
+      lrcActive = idx;
+      if (idx >= 0) {
+        const a = lrcLines[idx].el, box = el('lyrics');
+        a.classList.add('active');
+        const y = a.offsetTop + a.clientHeight / 2 - box.clientHeight / 2;
+        el('lyrics-inner').style.transform = `translateY(${-Math.max(0, y)}px)`;
+      } else { el('lyrics-inner').style.transform = 'translateY(0)'; }
+    }
+    // 逐字点亮(只处理当前行)
+    const cur = idx >= 0 ? lrcLines[idx] : null;
+    if (cur && cur.words) {
+      for (const w of cur.words) { const sung = w.t <= posMs; if (sung !== w._s) { w._s = sung; w.el.classList.toggle('sung', sung); } }
+    }
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -489,7 +536,7 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
-              accent: d.accentColor, lyrics: d.lyrics || '',
+              accent: d.accentColor, lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
               durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
               links: { apple: d.appleUrl, qq: d.qqUrl, netease: d.neteaseUrl, spotify: d.spotifyUrl } };
           }
@@ -505,7 +552,8 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '', accent: ai.accent_color || '', lyrics: ai.lyrics || '',
+          artwork: ai.cover_url || '', accent: ai.accent_color || '',
+          lyrics: ai.lyrics || '', lyricsTr: ai.lyrics_tr || '', lyricsRoma: ai.lyrics_roma || '', lyricsYRC: ai.lyrics_yrc || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
