@@ -131,7 +131,7 @@
   const params = new URLSearchParams(location.search);
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
-  const POLL_MS = 10000;
+  const POLL_MS = 6000;
   // 国内加速中转（EdgeOne /now）。默认走腾讯云 EdgeOne 港区节点；?api= 可覆盖，
   // 设成 ?api= 空串可强制回退浏览器直连 ListenBrainz。
   const API_BASE = params.has('api') ? params.get('api') : 'https://nowplaying-gxrbezuy.edgeone.dev';
@@ -268,7 +268,10 @@
   async function fetchState() {
     if (API_BASE) {
       try {
-        const r = await fetch(`${API_BASE}/now`);
+        // EdgeOne 在国内会 401/慢，加 2.5s 超时快速回退直连 LB，别让它拖慢每次轮询。
+        const ctl = new AbortController();
+        const to = setTimeout(() => ctl.abort(), 2500);
+        const r = await fetch(`${API_BASE}/now`, { cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(to));
         if (r.ok) {
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
@@ -292,10 +295,10 @@
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
-      const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
+      const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`, { cache: 'no-store' })).json();
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
       if (now) return fromLB(now, true, null);
-      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`)).json();
+      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`, { cache: 'no-store' })).json();
       const last = re.payload && re.payload.listens && re.payload.listens[0];
       if (last) return fromLB(last, false, last.listened_at);
       return { empty: true };
