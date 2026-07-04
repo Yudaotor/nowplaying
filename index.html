@@ -96,12 +96,16 @@
   .ic.show { display: inline-flex; }
   .ic:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .ic svg { width: 22px; height: 22px; display: block; }
-  .history-wrap { margin-top: 24px; }
-  .history-title { font-size: 11px; font-weight: 600; letter-spacing: .5px; color: #6b7280; margin-bottom: 10px; }
-  .history { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
-  .history a { display: block; width: 38px; height: 38px; border-radius: 8px; overflow: hidden; opacity: .72; transition: opacity .2s, transform .1s; background: linear-gradient(135deg, #2b2f3a, #1a1d26); }
-  .history a:hover { opacity: 1; transform: translateY(-1px); }
-  .history img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 8px; }
+  .history { display: flex; flex-direction: column; gap: 1px; }
+  .history a {
+    display: flex; align-items: baseline; gap: 10px; padding: 7px 8px;
+    border-radius: 8px; text-decoration: none; transition: background .15s ease;
+  }
+  .history a:hover { background: rgba(255,255,255,.06); }
+  .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-artist { flex-shrink: 0; max-width: 42%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -257,11 +261,12 @@
       const seen = new Set(); const items = [];
       for (const l of listens) {
         const m = l.track_metadata || {}; const ai = m.additional_info || {};
+        if (!m.track_name) continue;
         const key = `${m.artist_name}|${m.track_name}`;
-        if (seen.has(key) || !ai.cover_url) continue;
+        if (seen.has(key)) continue;
         seen.add(key);
-        items.push({ title: m.track_name, artist: m.artist_name, cover: ai.cover_url, url: ai.apple_music_url || ai.netease_url || '' });
-        if (items.length >= 6) break;
+        items.push({ title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' });
+        if (items.length >= 5) break;
       }
       renderHistory(items);
     } catch (e) {}
@@ -274,9 +279,9 @@
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
-      const img = document.createElement('img');
-      img.src = it.cover; img.alt = ''; img.referrerPolicy = 'no-referrer'; img.loading = 'lazy';
-      a.appendChild(img); box.appendChild(a);
+      const t = document.createElement('span'); t.className = 'h-title'; t.textContent = it.title;
+      const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
+      a.appendChild(t); a.appendChild(ar); box.appendChild(a);
     }
     wrap.classList.remove('hidden');
   }
