@@ -81,13 +81,17 @@
     display: flex; justify-content: space-between; margin-top: 8px;
     font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
   }
+  .links {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    margin-top: 20px;
+  }
   .song-link {
-    display: none; align-items: center; justify-content: center; gap: 6px;
-    margin: 20px auto 0; padding: 9px 18px; width: fit-content;
-    font-size: 13px; font-weight: 600; color: #f5f6f8; text-decoration: none;
+    display: none; align-items: center; gap: 4px;
+    padding: 7px 13px;
+    font-size: 12px; font-weight: 600; color: #f5f6f8; text-decoration: none;
     border-radius: 999px; background: rgba(255,255,255,.10);
     border: 1px solid rgba(255,255,255,.14);
-    transition: background .2s ease;
+    transition: background .2s ease; white-space: nowrap;
   }
   .song-link.show { display: inline-flex; }
   .song-link:hover { background: rgba(255,255,255,.18); }
@@ -114,7 +118,12 @@
     <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
     <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
   </div>
-  <a id="song-link" class="song-link" target="_blank" rel="noopener">在 Apple Music 打开 ↗</a>
+  <div id="links" class="links">
+    <a id="lk-apple" class="song-link" target="_blank" rel="noopener">Apple Music ↗</a>
+    <a id="lk-qq" class="song-link" target="_blank" rel="noopener">QQ音乐 ↗</a>
+    <a id="lk-netease" class="song-link" target="_blank" rel="noopener">网易云 ↗</a>
+    <a id="lk-spotify" class="song-link" target="_blank" rel="noopener">Spotify ↗</a>
+  </div>
   <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
 </main>
 <script>
@@ -190,15 +199,18 @@
       else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
       imgEl.style.opacity = 1;
     }
-    setSongLink(s.songUrl || '');
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, songUrl: s.songUrl || '' });
+    setLinks(s.links || {});
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {} });
   }
 
-  // “在 Apple Music 打开”跳转链接：采集器经 iTunes API 解析出的精确单曲页 URL。
-  function setSongLink(url) {
-    const a = el('song-link');
-    if (url) { a.href = url; a.classList.add('show'); }
-    else { a.removeAttribute('href'); a.classList.remove('show'); }
+  // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
+  const LINK_IDS = { apple: 'lk-apple', qq: 'lk-qq', netease: 'lk-netease', spotify: 'lk-spotify' };
+  function setLinks(links) {
+    for (const k in LINK_IDS) {
+      const a = el(LINK_IDS[k]); const url = links && links[k];
+      if (url) { a.href = url; a.classList.add('show'); }
+      else { a.removeAttribute('href'); a.classList.remove('show'); }
+    }
   }
 
   function paintIdle(msg) {
@@ -208,7 +220,7 @@
     el('artist').textContent = msg || '';
     el('album').textContent = '';
     setProgress(null);
-    setSongLink('');
+    setLinks({});
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -261,7 +273,8 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
-              durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate, songUrl: d.songUrl };
+              durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
+              links: { apple: d.appleUrl, qq: d.qqUrl, netease: d.neteaseUrl, spotify: d.spotifyUrl } };
           }
           if (d && d.empty) return { empty: true };
         }
@@ -275,7 +288,8 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '', songUrl: ai.apple_music_url || '',
+          artwork: ai.cover_url || '',
+          links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
