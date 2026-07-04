@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 预热连接:提前和 LB(德国、高延迟)/网易云图床握手,省首次请求的 TLS 往返。 -->
+<link rel="preconnect" href="https://api.listenbrainz.org" crossorigin>
+<link rel="dns-prefetch" href="https://p1.music.126.net">
+<link rel="dns-prefetch" href="https://p2.music.126.net">
+<link rel="dns-prefetch" href="https://p3.music.126.net">
 <title>正在听什么 ♪</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <style>
@@ -162,9 +167,9 @@
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
   const POLL_MS = 6000;
-  // 国内加速中转（EdgeOne /now）。默认走腾讯云 EdgeOne 港区节点；?api= 可覆盖，
-  // 设成 ?api= 空串可强制回退浏览器直连 ListenBrainz。
-  const API_BASE = params.has('api') ? params.get('api') : 'https://nowplaying-gxrbezuy.edgeone.dev';
+  // 默认直连 ListenBrainz(主用户在国内，EdgeOne 港区节点对国内 401、纯绕一趟)。
+  // 想走 EdgeOne 中转(海外更快)可 ?api=https://nowplaying-gxrbezuy.edgeone.dev。
+  const API_BASE = params.get('api') || '';
 
   const el = id => document.getElementById(id);
   el('lb-link').href = `https://listenbrainz.org/user/${encodeURIComponent(USER)}/`;
@@ -410,7 +415,8 @@
   else { paintIdle('连接中…'); }
 
   tick();
-  fetchHistory();
+  // 历史(74KB)延后,先让实时 now-playing 那条小请求抢到连接、卡片更快出。
+  setTimeout(fetchHistory, 800);
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
   setInterval(() => { if (!document.hidden) fetchHistory(); }, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); fetchHistory(); } });
