@@ -98,7 +98,14 @@
   .ic svg { width: 22px; height: 22px; display: block; }
   .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 8px; }
-  .history { display: flex; flex-direction: column; gap: 1px; }
+  .history {
+    display: flex; flex-direction: column; gap: 1px;
+    max-height: 264px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent;
+  }
+  .history::-webkit-scrollbar { width: 6px; }
+  .history::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+  .history::-webkit-scrollbar-track { background: transparent; }
   .history a {
     display: flex; align-items: baseline; gap: 10px; padding: 7px 8px;
     border-radius: 8px; text-decoration: none; transition: background .15s ease;
@@ -256,17 +263,13 @@
   async function fetchHistory() {
     if (USER === 'CHANGE_ME') return;
     try {
-      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=12`, { cache: 'no-store' })).json();
+      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, { cache: 'no-store' })).json();
       const listens = (re.payload && re.payload.listens) || [];
-      const seen = new Set(); const items = [];
+      const items = [];
       for (const l of listens) {
         const m = l.track_metadata || {}; const ai = m.additional_info || {};
         if (!m.track_name) continue;
-        const key = `${m.artist_name}|${m.track_name}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
         items.push({ title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' });
-        if (items.length >= 5) break;
       }
       renderHistory(items);
     } catch (e) {}
@@ -409,7 +412,7 @@
   tick();
   fetchHistory();
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
-  setInterval(() => { if (!document.hidden) fetchHistory(); }, 30000);
+  setInterval(() => { if (!document.hidden) fetchHistory(); }, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); fetchHistory(); } });
 
   // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
