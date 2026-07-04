@@ -145,6 +145,8 @@
   .status.live { background: rgba(48, 209, 88, .16); color: #30d158; }
   .eq { display: none; align-items: flex-end; gap: 2px; height: 12px; }
   .status.live .eq { display: inline-flex; }
+  .device-icon { font-size: 12px; opacity: .85; line-height: 1; }
+  .device-icon:empty { display: none; }
   .eq span {
     width: 3px; border-radius: 1px; background: #30d158;
     animation: eq 1s ease-in-out infinite;
@@ -242,6 +244,7 @@
   <div id="status" class="status">
     <span class="eq"><span></span><span></span><span></span></span>
     <span id="status-text">加载中…</span>
+    <span id="device-icon" class="device-icon"></span>
   </div>
   <h1 id="title">…</h1>
   <div id="artist" class="artist"></div>
@@ -342,6 +345,9 @@
     el('status-text').textContent = live ? '正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
+    // 设备来源:📱 iPhone / 💻 Mac(采集器打的 source 标)。未知则不显示。
+    el('device-icon').textContent = s.source === 'iphone' ? '📱' : s.source === 'mac' ? '💻' : '';
+    el('device-icon').title = s.source === 'iphone' ? 'iPhone' : s.source === 'mac' ? 'Mac' : '';
     el('title').textContent = title;
     el('artist').textContent = artist;
     el('album').textContent = s.album || '';
@@ -364,7 +370,7 @@
     // 播放没有进度数据，歌词无法滚动、只会僵在首行，此时干脆不显示。
     const syncable = !!s.playing && s.durationMs > 0 && typeof s.progressTs === 'number';
     setLyrics(s, syncable, sameTrack);
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '' });
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '' });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
 
@@ -499,6 +505,7 @@
     el('art').classList.remove('playing');
     el('art-wrap').classList.remove('playing');
     el('status-text').textContent = '暂无播放';
+    el('device-icon').textContent = '';
     el('title').textContent = '这会儿很安静';
     el('artist').textContent = msg || '';
     el('album').textContent = '';
@@ -666,7 +673,7 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
-              accent: d.accentColor, lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
+              accent: d.accentColor, source: d.device || '', lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
               durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
               links: { apple: d.appleUrl, qq: d.qqUrl, netease: d.neteaseUrl, spotify: d.spotifyUrl } };
           }
@@ -682,7 +689,7 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '', accent: ai.accent_color || '',
+          artwork: ai.cover_url || '', accent: ai.accent_color || '', source: ai.source || '',
           lyrics: ai.lyrics || '', lyricsTr: ai.lyrics_tr || '', lyricsRoma: ai.lyrics_roma || '', lyricsYRC: ai.lyrics_yrc || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
