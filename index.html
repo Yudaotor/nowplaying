@@ -171,6 +171,12 @@
   const LAST_KEY = 'np:last';
   function persist(s) { try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch (e) {} }
   function loadPersisted() { try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { return null; } }
+  // 最后一次「看到正在播放」的曲目(带 seenAt)。停播后 LB 只保留满 scrobble 阈值的
+  // listen，短播/被我重启清零的曲目不在其中，会让显示回退到更旧的歌。用它兜住：空闲时
+  // 若这条比 LB 最新 listen 更近，就继续显示它当「上次播放」。
+  const LIVE_KEY = 'np:lastLive';
+  function saveLive(s) { try { localStorage.setItem(LIVE_KEY, JSON.stringify({ ...s, seenAt: Date.now() })); } catch (e) {} }
+  function loadLive() { try { return JSON.parse(localStorage.getItem(LIVE_KEY) || 'null'); } catch (e) { return null; } }
 
   let curKey = '';
   async function paint(s) {
@@ -201,6 +207,7 @@
     }
     setLinks(s.links || {});
     persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {} });
+    if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {} });
   }
 
   // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
@@ -309,6 +316,17 @@
   async function tick() {
     if (USER === 'CHANGE_ME') { paintIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
     const s = await fetchState();
+    // 空闲态(拿到的是 LB 的“上次播放”而非正在播放)：若我们最近看到过一首正在播放的、
+    // 且比这条 LB listen 更近，就显示那首——避免回退到更旧、只因它满了 scrobble 阈值的歌。
+    if (s && !s.empty && !s.playing) {
+      const lv = loadLive();
+      if (lv && lv.seenAt && `${lv.artist}|${lv.title}` !== `${s.artist}|${s.title}`
+          && (!s.listenedAt || lv.seenAt / 1000 > s.listenedAt)) {
+        await paint({ title: lv.title, artist: lv.artist, album: lv.album, artwork: lv.artwork,
+          links: lv.links, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) });
+        setProgress(null); everRendered = true; return;
+      }
+    }
     if (s && !s.empty) { await paint(s); setProgress(s); everRendered = true; return; }
     if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); return; }
     // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏。
