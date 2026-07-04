@@ -43,7 +43,10 @@
     border: 1px solid rgba(255,255,255,.08);
     box-shadow: 0 24px 80px rgba(0,0,0,.55);
     text-align: center;
+    transition: opacity .35s ease;
   }
+  /* 首屏显示的是本地缓存的上一首，标记为“更新中”(降透明度)，拉到实时数据后恢复。 */
+  .card.stale { opacity: .5; }
   .art-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 26px; }
   .art {
     width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
@@ -253,6 +256,12 @@
     else root.style.removeProperty('--accent');
   }
 
+  // 首屏显示的是本地缓存的上一首：置灰 + 状态显示“更新中…”，拉到实时数据后由 clear 恢复。
+  function setStale(on) {
+    document.querySelector('.card').classList.toggle('stale', on);
+    if (on) { el('status').classList.remove('live'); el('status-text').textContent = '更新中…'; }
+  }
+
   // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
   const LINK_IDS = { apple: 'lk-apple', qq: 'lk-qq', netease: 'lk-netease', spotify: 'lk-spotify' };
   function setLinks(links) {
@@ -303,6 +312,7 @@
     setProgress(null);
     setLinks({});
     setAccent('');
+    setStale(false);
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -400,10 +410,10 @@
           && (!s.listenedAt || lv.seenAt / 1000 > s.listenedAt)) {
         await paint({ title: lv.title, artist: lv.artist, album: lv.album, artwork: lv.artwork,
           links: lv.links, accent: lv.accent, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) });
-        setProgress(null); everRendered = true; return;
+        setProgress(null); setStale(false); everRendered = true; return;
       }
     }
-    if (s && !s.empty) { await paint(s); setProgress(s); everRendered = true; return; }
+    if (s && !s.empty) { await paint(s); setProgress(s); setStale(false); everRendered = true; return; }
     if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); return; }
     // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏。
     if (!everRendered) paintIdle('连接中…稍后自动重试');
@@ -411,7 +421,7 @@
 
   // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。
   const persisted = loadPersisted();
-  if (persisted && persisted.title) { everRendered = true; paint(persisted); }
+  if (persisted && persisted.title) { everRendered = true; paint(persisted); setStale(true); }
   else { paintIdle('连接中…'); }
 
   tick();
