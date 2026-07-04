@@ -433,8 +433,26 @@
         items.push({ title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' });
       }
       renderHistory(items);
-      renderTodayStat(listens);
+      renderTodayStat(await collectTodayListens(listens));
     } catch (e) {}
+  }
+  // 收集「今天」的全部 listen 用于统计。LB 单次最多 100 条，超过就用 max_ts 往前翻页，
+  // 直到翻到早于当天 0 点(或翻完/到上限)。普通日子首页就已跨过 0 点、只 1 次请求；
+  // 只有一天听超 100 首才会多翻几页。上限 10 页(1000 首)兜底，防跑飞。
+  async function collectTodayListens(firstPage) {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const cutoff = Math.floor(midnight.getTime() / 1000);
+    const acc = [];
+    let page = firstPage;
+    for (let i = 0; i < 10; i++) {
+      if (!page || !page.length) break;
+      for (const l of page) if ((l.listened_at || 0) >= cutoff) acc.push(l);
+      const oldest = page[page.length - 1].listened_at || 0;
+      if (oldest < cutoff || page.length < 100) break; // 已跨过 0 点 / 没有更早的了
+      const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100&max_ts=${oldest}`, 12000);
+      page = (re.payload && re.payload.listens) || [];
+    }
+    return acc;
   }
   // 今日收听统计:按本地当天 0 点过滤 listened_at(电脑+手机的完成收听都进 LB 带时间戳)。
   // 时长优先用各 listen 的 duration_ms;iPhone 经 Last.fm 桥接的没有时长(Last.fm 不给),
