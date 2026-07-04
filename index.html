@@ -42,9 +42,9 @@
   .art-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 26px; }
   .art {
     width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
-    box-shadow: 0 16px 48px rgba(0,0,0,.6);
+    box-shadow: 0 16px 48px rgba(0,0,0,.55), 0 0 30px -4px var(--accent, transparent);
     background: linear-gradient(135deg, #2b2f3a, #1a1d26);
-    transition: opacity .5s ease;
+    transition: opacity .5s ease, box-shadow .8s ease;
   }
   .art.placeholder { display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: .85; }
   .status {
@@ -75,7 +75,8 @@
   .bar { position: relative; height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
   .bar-fill {
     position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-    border-radius: 999px; background: #f5f6f8;
+    border-radius: 999px; background: var(--accent, #f5f6f8);
+    transition: background .8s ease;
   }
   .times {
     display: flex; justify-content: space-between; margin-top: 8px;
@@ -95,7 +96,13 @@
   .ic.show { display: inline-flex; }
   .ic:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .ic svg { width: 22px; height: 22px; display: block; }
-  .meta { margin-top: 20px; font-size: 12px; color: #6b7280; }
+  .history-wrap { margin-top: 24px; }
+  .history-title { font-size: 11px; font-weight: 600; letter-spacing: .5px; color: #6b7280; margin-bottom: 10px; }
+  .history { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
+  .history a { display: block; width: 38px; height: 38px; border-radius: 8px; overflow: hidden; opacity: .72; transition: opacity .2s, transform .1s; background: linear-gradient(135deg, #2b2f3a, #1a1d26); }
+  .history a:hover { opacity: 1; transform: translateY(-1px); }
+  .history img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
   .hidden { display: none !important; }
@@ -131,6 +138,10 @@
     <a id="lk-spotify" class="ic" target="_blank" rel="noopener" aria-label="Spotify" title="Spotify" style="--c:#1DB954">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
+  </div>
+  <div id="history-wrap" class="history-wrap hidden">
+    <div class="history-title">最近播放</div>
+    <div id="history" class="history"></div>
   </div>
   <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
 </main>
@@ -214,8 +225,16 @@
       imgEl.style.opacity = 1;
     }
     setLinks(s.links || {});
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {} });
-    if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {} });
+    setAccent(s.accent);
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '' });
+    if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
+  }
+
+  // 按当前封面主色给卡片染色(进度条 + 封面光晕);采集器算好的 hex。
+  function setAccent(hex) {
+    const root = document.documentElement;
+    if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) root.style.setProperty('--accent', hex);
+    else root.style.removeProperty('--accent');
   }
 
   // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
@@ -228,6 +247,40 @@
     }
   }
 
+  // 最近播放历史条:LB 已完成的 listen(现含 iPhone),去重取带封面的前几首,
+  // 缩略图可点(跳该歌的 Apple/网易云)。每 30s 刷一次。
+  async function fetchHistory() {
+    if (USER === 'CHANGE_ME') return;
+    try {
+      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=12`, { cache: 'no-store' })).json();
+      const listens = (re.payload && re.payload.listens) || [];
+      const seen = new Set(); const items = [];
+      for (const l of listens) {
+        const m = l.track_metadata || {}; const ai = m.additional_info || {};
+        const key = `${m.artist_name}|${m.track_name}`;
+        if (seen.has(key) || !ai.cover_url) continue;
+        seen.add(key);
+        items.push({ title: m.track_name, artist: m.artist_name, cover: ai.cover_url, url: ai.apple_music_url || ai.netease_url || '' });
+        if (items.length >= 6) break;
+      }
+      renderHistory(items);
+    } catch (e) {}
+  }
+  function renderHistory(items) {
+    const box = el('history'), wrap = el('history-wrap');
+    if (!items.length) { wrap.classList.add('hidden'); return; }
+    box.textContent = '';
+    for (const it of items) {
+      const a = document.createElement('a');
+      a.title = `${it.title} — ${it.artist}`;
+      if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
+      const img = document.createElement('img');
+      img.src = it.cover; img.alt = ''; img.referrerPolicy = 'no-referrer'; img.loading = 'lazy';
+      a.appendChild(img); box.appendChild(a);
+    }
+    wrap.classList.remove('hidden');
+  }
+
   function paintIdle(msg) {
     el('status').classList.remove('live');
     el('status-text').textContent = '暂无播放';
@@ -236,6 +289,7 @@
     el('album').textContent = '';
     setProgress(null);
     setLinks({});
+    setAccent('');
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -291,6 +345,7 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
+              accent: d.accentColor,
               durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
               links: { apple: d.appleUrl, qq: d.qqUrl, netease: d.neteaseUrl, spotify: d.spotifyUrl } };
           }
@@ -306,7 +361,7 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '',
+          artwork: ai.cover_url || '', accent: ai.accent_color || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
@@ -331,7 +386,7 @@
       if (lv && lv.seenAt && `${lv.artist}|${lv.title}` !== `${s.artist}|${s.title}`
           && (!s.listenedAt || lv.seenAt / 1000 > s.listenedAt)) {
         await paint({ title: lv.title, artist: lv.artist, album: lv.album, artwork: lv.artwork,
-          links: lv.links, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) });
+          links: lv.links, accent: lv.accent, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) });
         setProgress(null); everRendered = true; return;
       }
     }
@@ -347,8 +402,10 @@
   else { paintIdle('连接中…'); }
 
   tick();
+  fetchHistory();
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  setInterval(() => { if (!document.hidden) fetchHistory(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); fetchHistory(); } });
 
   // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
   if ('serviceWorker' in navigator) {
