@@ -261,6 +261,14 @@
     document.querySelector('.card').classList.toggle('stale', on);
     if (on) { el('status').classList.remove('live'); el('status-text').textContent = '更新中…'; }
   }
+  // 首次拉取失败(LB 挂/超时)时:别一直顶着“更新中…”,把缓存那首按“上次播放”正常显示、
+  // 取消置灰(后台仍每 6s 悄悄重试,LB 恢复了会自动换成实时)。
+  async function revertStale() {
+    if (!document.querySelector('.card').classList.contains('stale')) return;
+    const p = loadPersisted();
+    if (p && p.title) await paint({ ...p, playing: false });
+    document.querySelector('.card').classList.remove('stale');
+  }
 
   // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
   const LINK_IDS = { apple: 'lk-apple', qq: 'lk-qq', netease: 'lk-netease', spotify: 'lk-spotify' };
@@ -277,7 +285,7 @@
   async function fetchHistory() {
     if (USER === 'CHANGE_ME') return;
     try {
-      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, { cache: 'no-store' })).json();
+      const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, 12000);
       const listens = (re.payload && re.payload.listens) || [];
       const items = [];
       for (const l of listens) {
@@ -355,6 +363,14 @@
   }
   requestAnimationFrame(frame);
 
+  // 带超时的 JSON 拉取:LB(德国)时慢时挂,不加超时会把 tick 卡住、导致“更新中”一直不散。
+  async function fetchJSON(url, ms) {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), ms || 8000);
+    try { return await (await fetch(url, { cache: 'no-store', signal: ctl.signal })).json(); }
+    finally { clearTimeout(to); }
+  }
+
   // 取一次状态：优先 EdgeOne /now（海外快），失败/国内401则回退直连 LB。
   // 返回 状态对象 / {empty:true} / null(彻底失败，此时不要清屏，保留上一首)。
   async function fetchState() {
@@ -388,10 +404,10 @@
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
-      const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`, { cache: 'no-store' })).json();
+      const pn = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`, 8000);
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
       if (now) return fromLB(now, true, null);
-      const re = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`, { cache: 'no-store' })).json();
+      const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=1`, 8000);
       const last = re.payload && re.payload.listens && re.payload.listens[0];
       if (last) return fromLB(last, false, last.listened_at);
       return { empty: true };
@@ -414,15 +430,20 @@
       }
     }
     if (s && !s.empty) { await paint(s); setProgress(s); setStale(false); everRendered = true; return; }
-    if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); return; }
-    // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏。
-    if (!everRendered) paintIdle('连接中…稍后自动重试');
+    if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); else await revertStale(); return; }
+    // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏；
+    // 但首屏的“更新中…”不能一直挂着，把缓存那首按上次播放正常显示（后台继续重试）。
+    if (!everRendered) paintIdle('连接中…稍后自动重试'); else await revertStale();
   }
 
   // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。
   const persisted = loadPersisted();
-  if (persisted && persisted.title) { everRendered = true; paint(persisted); setStale(true); }
-  else { paintIdle('连接中…'); }
+  if (persisted && persisted.title) {
+    everRendered = true; paint(persisted); setStale(true);
+    // 兜底:LB 若全程卡住(所有拉取都超时),“更新中…”最多挂 10 秒就回落到缓存正常态,
+    // 别让用户干等——后台每 6s 仍在悄悄重试,恢复了自动换实时。
+    setTimeout(revertStale, 10000);
+  } else { paintIdle('连接中…'); }
 
   tick();
   // 历史(74KB)延后,先让实时 now-playing 那条小请求抢到连接、卡片更快出。
