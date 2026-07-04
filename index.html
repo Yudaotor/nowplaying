@@ -203,7 +203,9 @@
   .ic:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .ic svg { width: 22px; height: 22px; display: block; }
   .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
-  .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 8px; }
+  .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; }
+  .today-stat { font-size: 11px; font-weight: 600; color: var(--accent, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history {
     display: flex; flex-direction: column; gap: 1px;
     max-height: 264px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -266,7 +268,10 @@
   <div class="side">
   <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
   <div id="history-wrap" class="history-wrap hidden">
-    <div class="history-title">最近播放</div>
+    <div class="history-head">
+      <span class="history-title">最近播放</span>
+      <span id="today-stat" class="today-stat"></span>
+    </div>
     <div id="history" class="history"></div>
   </div>
   </div><!-- /.side -->
@@ -428,7 +433,32 @@
         items.push({ title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' });
       }
       renderHistory(items);
+      renderTodayStat(listens);
     } catch (e) {}
+  }
+  // 今日收听统计:按本地当天 0 点过滤 listened_at(电脑+手机的完成收听都进 LB 带时间戳)。
+  // 时长优先用各 listen 的 duration_ms;iPhone 经 Last.fm 桥接的没有时长(Last.fm 不给),
+  // 用当天已知时长的均值补估、并标"约",不假装精确。
+  function renderTodayStat(listens) {
+    const stat = el('today-stat');
+    if (!stat) return;
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const cutoff = Math.floor(midnight.getTime() / 1000);
+    let count = 0, knownMs = 0, knownN = 0, unknownN = 0;
+    for (const l of listens) {
+      if ((l.listened_at || 0) < cutoff) continue;
+      count++;
+      const dm = (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms;
+      if (typeof dm === 'number' && dm > 0) { knownMs += dm; knownN++; } else { unknownN++; }
+    }
+    if (!count) { stat.textContent = ''; return; }
+    const avg = knownN ? knownMs / knownN : 210000; // 未知时长的估值:当天均值，无则 3.5 分
+    const totalMs = knownMs + unknownN * avg;
+    const mins = Math.round(totalMs / 60000);
+    const h = Math.floor(mins / 60), mm = mins % 60;
+    const dur = h ? `${h} 小时 ${mm} 分` : `${mm} 分`;
+    const approx = unknownN > 0 ? '约 ' : '';
+    stat.textContent = `今日 · ${count} 首 · ${approx}${dur}`;
   }
   function renderHistory(items) {
     const box = el('history'), wrap = el('history-wrap');
