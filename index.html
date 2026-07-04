@@ -81,7 +81,17 @@
     display: flex; justify-content: space-between; margin-top: 8px;
     font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
   }
-  .meta { margin-top: 22px; font-size: 12px; color: #6b7280; }
+  .song-link {
+    display: none; align-items: center; justify-content: center; gap: 6px;
+    margin: 20px auto 0; padding: 9px 18px; width: fit-content;
+    font-size: 13px; font-weight: 600; color: #f5f6f8; text-decoration: none;
+    border-radius: 999px; background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.14);
+    transition: background .2s ease;
+  }
+  .song-link.show { display: inline-flex; }
+  .song-link:hover { background: rgba(255,255,255,.18); }
+  .meta { margin-top: 20px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
   .hidden { display: none !important; }
@@ -104,6 +114,7 @@
     <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
     <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
   </div>
+  <a id="song-link" class="song-link" target="_blank" rel="noopener">在 Apple Music 打开 ↗</a>
   <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
 </main>
 <script>
@@ -179,7 +190,15 @@
       else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
       imgEl.style.opacity = 1;
     }
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art });
+    setSongLink(s.songUrl || '');
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, songUrl: s.songUrl || '' });
+  }
+
+  // “在 Apple Music 打开”跳转链接：采集器经 iTunes API 解析出的精确单曲页 URL。
+  function setSongLink(url) {
+    const a = el('song-link');
+    if (url) { a.href = url; a.classList.add('show'); }
+    else { a.removeAttribute('href'); a.classList.remove('show'); }
   }
 
   function paintIdle(msg) {
@@ -189,6 +208,7 @@
     el('artist').textContent = msg || '';
     el('album').textContent = '';
     setProgress(null);
+    setSongLink('');
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -241,7 +261,7 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
-              durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate };
+              durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate, songUrl: d.songUrl };
           }
           if (d && d.empty) return { empty: true };
         }
@@ -255,7 +275,7 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '',
+          artwork: ai.cover_url || '', songUrl: ai.apple_music_url || '',
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
       const pn = await (await fetch(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`)).json();
