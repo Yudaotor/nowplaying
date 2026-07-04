@@ -119,10 +119,13 @@
     background: radial-gradient(circle, #12101c 0 32%, #c8cdd6 34% 60%, #12101c 62% 100%);
     box-shadow: 0 0 0 3px rgba(0,0,0,.4);
   }
-  .art-wrap.vinyl .tonearm { display: block; position: absolute; top: -8px; right: -4px; width: 130px; height: 16px; transform-origin: right center; transform: rotate(26deg); pointer-events: none; z-index: 3; }
-  .tonearm .bar { position: absolute; right: 8px; top: 6px; width: 108px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, #c8cdd6, #8a91a0); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+  /* 唱臂:暂停时抬起(42°离盘)、播放时落到唱片外圈(8°)，平滑摆动。 */
+  .art-wrap.vinyl .tonearm { display: block; position: absolute; top: 14px; right: 2px; width: 126px; height: 16px; transform-origin: right center; transform: rotate(42deg); transition: transform .6s ease; pointer-events: none; z-index: 3; }
+  .art-wrap.vinyl.playing .tonearm { transform: rotate(8deg); }
+  @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .tonearm { transition: none; } }
+  .tonearm .bar { position: absolute; right: 8px; top: 6px; width: 106px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, #c8cdd6, #8a91a0); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
   .tonearm .pivot { position: absolute; right: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle, #e6e9ee, #8a91a0); }
-  .tonearm .head { position: absolute; left: 8px; top: 3px; width: 14px; height: 9px; border-radius: 2px; background: #e6e9ee; }
+  .tonearm .head { position: absolute; left: 6px; top: 2px; width: 14px; height: 11px; border-radius: 2px; background: #e6e9ee; }
   /* 切换按钮：卡片右上角小圆钮 */
   .vinyl-toggle {
     position: absolute; top: 14px; right: 14px; z-index: 4; width: 34px; height: 34px;
@@ -330,6 +333,7 @@
     const paused = !!s.playing && s.rate === 0;
     el('status').classList.toggle('live', live);
     el('art').classList.toggle('playing', live);
+    el('art-wrap').classList.toggle('playing', live); // 黑胶唱臂落下/抬起
     el('status-text').textContent = live ? '正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
@@ -442,6 +446,7 @@
   function paintIdle(msg) {
     el('status').classList.remove('live');
     el('art').classList.remove('playing');
+    el('art-wrap').classList.remove('playing');
     el('status-text').textContent = '暂无播放';
     el('title').textContent = '这会儿很安静';
     el('artist').textContent = msg || '';
