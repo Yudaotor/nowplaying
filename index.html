@@ -355,7 +355,10 @@
     }
     setLinks(s.links || {});
     setAccent(s.accent);
-    setLyrics(s, !!s.playing, sameTrack);
+    // 歌词只在"有播放位置可驱动"时显示(与进度条同一判据)。iPhone 经 Last.fm 桥接的
+    // 播放没有进度数据，歌词无法滚动、只会僵在首行，此时干脆不显示。
+    const syncable = !!s.playing && s.durationMs > 0 && typeof s.progressTs === 'number';
+    setLyrics(s, syncable, sameTrack);
     persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '' });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
