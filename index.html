@@ -55,6 +55,13 @@
     transition: opacity .5s ease, box-shadow .8s ease;
   }
   .art.placeholder { display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: .85; }
+  /* 播放中封面光晕随节奏轻微“呼吸”；暂停/上次播放时静止。 */
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 16px 48px rgba(0,0,0,.55), 0 0 24px -6px var(--accent, transparent); transform: scale(1); }
+    50%      { box-shadow: 0 18px 52px rgba(0,0,0,.55), 0 0 40px 0px var(--accent, transparent); transform: scale(1.012); }
+  }
+  .art.playing { animation: breathe 3.8s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .art.playing { animation: none; } }
   .status {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 13px; font-weight: 600; letter-spacing: .4px;
@@ -90,6 +97,16 @@
     display: flex; justify-content: space-between; margin-top: 8px;
     font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
   }
+  /* 同步歌词：固定高度视口，内层整体位移把当前行滚到中间，上下渐隐遮罩。 */
+  .lyrics { display: none; margin-top: 20px; height: 132px; overflow: hidden; position: relative;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+            mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
+  .lyrics.show { display: block; }
+  .lyrics-inner { transition: transform .45s cubic-bezier(.22,.61,.36,1); will-change: transform; }
+  .lrc-line { min-height: 26px; line-height: 1.35; padding: 3px 0; font-size: 14px;
+    color: #7b8290; transition: color .3s ease, opacity .3s ease; opacity: .6; overflow-wrap: anywhere; }
+  .lrc-line.active { color: var(--accent, #f0f2f5); opacity: 1; font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) { .lyrics-inner { transition: none; } }
   .links {
     display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
     margin-top: 22px;
@@ -144,6 +161,7 @@
     <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
     <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
   </div>
+  <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
   <div id="links" class="links">
     <a id="lk-apple" class="ic" target="_blank" rel="noopener" aria-label="Apple Music" title="Apple Music" style="--c:#FA2D48">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03a12.5 12.5 0 001.57-.1c.822-.106 1.596-.35 2.295-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.045-1.773-.6-1.943-1.536a1.88 1.88 0 011.038-2.022c.323-.16.67-.25 1.018-.324.378-.082.758-.153 1.134-.24.274-.063.457-.23.51-.516a.904.904 0 00.02-.193c0-1.815 0-3.63-.002-5.443a.725.725 0 00-.026-.185c-.04-.15-.15-.243-.304-.234-.16.01-.318.035-.475.066-.76.15-1.52.303-2.28.456l-2.325.47-1.374.278c-.016.003-.032.01-.048.013-.277.077-.377.203-.39.49-.002.042 0 .086 0 .13-.002 2.602 0 5.204-.003 7.805 0 .42-.047.836-.215 1.227-.278.64-.77 1.04-1.434 1.233-.35.1-.71.16-1.075.172-.96.036-1.755-.6-1.92-1.544-.14-.812.23-1.685 1.154-2.075.357-.15.73-.232 1.108-.31.287-.06.575-.116.86-.177.383-.083.583-.323.6-.714v-.15c0-2.96 0-5.922.002-8.882 0-.123.013-.25.042-.37.07-.285.273-.448.546-.518.255-.066.515-.112.774-.165.733-.15 1.466-.296 2.2-.444l2.27-.46c.67-.134 1.34-.27 2.01-.403.22-.043.442-.088.663-.106.31-.025.523.17.554.482.008.073.012.148.012.223.002 1.91.002 3.822 0 5.732z"/></svg>
@@ -224,6 +242,7 @@
     const live = !!s.playing && s.rate !== 0;
     const paused = !!s.playing && s.rate === 0;
     el('status').classList.toggle('live', live);
+    el('art').classList.toggle('playing', live);
     el('status-text').textContent = live ? '正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
@@ -245,6 +264,7 @@
     }
     setLinks(s.links || {});
     setAccent(s.accent);
+    setLyrics(s.lyrics || '', !!s.playing, sameTrack);
     persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '' });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
@@ -313,14 +333,63 @@
 
   function paintIdle(msg) {
     el('status').classList.remove('live');
+    el('art').classList.remove('playing');
     el('status-text').textContent = '暂无播放';
     el('title').textContent = '这会儿很安静';
     el('artist').textContent = msg || '';
     el('album').textContent = '';
     setProgress(null);
+    setLyrics('', false, false);
     setLinks({});
     setAccent('');
     setStale(false);
+  }
+
+  // ---- 同步歌词(LRC)----:采集器把网易云带时间轴歌词塞进 additional_info.lyrics，
+  // 这里解析成 [{t,el}]，在进度条 rAF 里按外推位置高亮当前行、整体位移滚到中间。
+  let lrcLines = [];   // [{t: ms, el}]
+  let lrcActive = -1;
+  function parseLRC(text) {
+    const out = [];
+    for (const raw of (text || '').split('\n')) {
+      const line = raw.trim();
+      const tags = [...line.matchAll(/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g)];
+      if (!tags.length) continue;
+      const txt = line.replace(/\[[^\]]*\]/g, '').trim();
+      if (!txt) continue; // 跳过纯标签/元信息行([ti:]、[by:] 等)
+      for (const m of tags) {
+        const frac = m[3] ? +(m[3] + '00').slice(0, 3) : 0;
+        out.push({ t: (+m[1] * 60 + +m[2]) * 1000 + frac, text: txt });
+      }
+    }
+    return out.sort((a, b) => a.t - b.t);
+  }
+  function setLyrics(text, playing, sameTrack) {
+    const wrap = el('lyrics'), inner = el('lyrics-inner');
+    if (!playing) { wrap.classList.remove('show'); return; } // 只在播放时显示(才可同步)
+    if (!sameTrack || !lrcLines.length) {
+      const parsed = parseLRC(text);
+      inner.textContent = ''; lrcActive = -1; inner.style.transform = 'translateY(0)';
+      if (!parsed.length) { lrcLines = []; wrap.classList.remove('show'); return; }
+      lrcLines = parsed.map(p => {
+        const d = document.createElement('div'); d.className = 'lrc-line'; d.textContent = p.text;
+        inner.appendChild(d); return { t: p.t, el: d };
+      });
+    }
+    wrap.classList.add('show');
+  }
+  function syncLyrics(posMs) {
+    if (!lrcLines.length) return;
+    let idx = -1;
+    for (let i = 0; i < lrcLines.length && lrcLines[i].t <= posMs; i++) idx = i;
+    if (idx === lrcActive) return;
+    if (lrcActive >= 0) lrcLines[lrcActive].el.classList.remove('active');
+    lrcActive = idx;
+    if (idx < 0) { el('lyrics-inner').style.transform = 'translateY(0)'; return; }
+    const a = lrcLines[idx].el, box = el('lyrics');
+    a.classList.add('active');
+    const y = a.offsetTop + a.clientHeight / 2 - box.clientHeight / 2;
+    el('lyrics-inner').style.transform = `translateY(${-Math.max(0, y)}px)`;
   }
 
   // 进度条：以 progressTs 为锚点外推实时位置（连续播放时 elapsedTime 不刷新，
@@ -358,6 +427,7 @@
         el('t-cur').textContent = fmtTime(pos);
         el('t-dur').textContent = fmtTime(pb.durationMs);
       }
+      syncLyrics(pos);
     }
     requestAnimationFrame(frame);
   }
@@ -384,7 +454,7 @@
           const d = await r.json();
           if (d && d.ok && !d.empty && d.title) {
             return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt, artwork: d.artwork,
-              accent: d.accentColor,
+              accent: d.accentColor, lyrics: d.lyrics || '',
               durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
               links: { apple: d.appleUrl, qq: d.qqUrl, netease: d.neteaseUrl, spotify: d.spotifyUrl } };
           }
@@ -400,7 +470,7 @@
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
         return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
-          artwork: ai.cover_url || '', accent: ai.accent_color || '',
+          artwork: ai.cover_url || '', accent: ai.accent_color || '', lyrics: ai.lyrics || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
       };
