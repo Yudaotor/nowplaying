@@ -103,16 +103,11 @@
   .art.playing { animation: breathe 3.8s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) { .art.playing { animation: none; } }
   /* ---- 黑胶模式(开关切换,存 localStorage)：封面变圆盘、播放时慢速旋转、叠凹槽+轴孔+唱臂 ---- */
-  .grooves, .spindle, .tonearm { display: none; }
+  .spindle, .tonearm { display: none; }
   .art-wrap.vinyl .art { border-radius: 50%; }
   .art-wrap.vinyl .art.playing { animation: vinylspin 18s linear infinite; } /* 慢速 */
   @keyframes vinylspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .art.playing { animation: none; } }
-  .art-wrap.vinyl .grooves {
-    display: block; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-    background: repeating-radial-gradient(circle at 50% 50%, rgba(0,0,0,.28) 0 1px, transparent 1px 5px),
-                radial-gradient(circle at 50% 50%, transparent 0 27%, rgba(0,0,0,.30) 27% 30%, transparent 30% 100%);
-  }
   .art-wrap.vinyl .spindle {
     display: block; position: absolute; left: 50%; top: 50%; width: 15px; height: 15px;
     transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
@@ -237,7 +232,6 @@
   <div class="np">
   <div id="art-wrap" class="art-wrap">
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
-    <div class="grooves"></div>
     <div class="spindle"></div>
     <div class="tonearm"><div class="pivot"></div><div class="bar"></div><div class="head"></div></div>
   </div>
