@@ -19,14 +19,15 @@
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
     background: #0d0f14;
     color: #f5f6f8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    display: grid;
+    place-items: center;
+    /* 内容比屏幕高时页面正常滚动(不再 overflow:hidden 裁切)；带安全区避让刘海/底条。 */
+    padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
     position: relative;
   }
   #bg {
-    position: absolute; inset: -60px;
+    position: fixed; inset: -60px;
     background-size: cover; background-position: center;
     filter: blur(60px) saturate(1.6) brightness(0.45);
     transition: background-image .8s ease;
@@ -34,8 +35,9 @@
   }
   .card {
     position: relative; z-index: 1;
-    width: min(92vw, 380px);
-    padding: 36px 28px 32px;
+    width: min(92vw, 400px);
+    display: flex; flex-direction: column;
+    padding: 32px 26px 26px;
     border-radius: 28px;
     background: rgba(22, 25, 33, .58);
     backdrop-filter: blur(30px) saturate(1.4);
@@ -45,9 +47,29 @@
     text-align: center;
     transition: opacity .35s ease;
   }
+  /* 宽屏(≥820px)且有侧栏内容(歌词/历史)时，横向铺成两栏：左=正在播放，右=歌词+历史。 */
+  @media (min-width: 820px) {
+    .card.two-col {
+      width: min(94vw, 900px);
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      grid-template-areas: "np side" "meta meta";
+      column-gap: 44px; row-gap: 6px;
+      align-items: start;
+      padding: 40px 44px 28px;
+    }
+    .card.two-col .np   { grid-area: np; }
+    .card.two-col .side { grid-area: side; display: flex; flex-direction: column; min-width: 0; }
+    .card.two-col .meta { grid-area: meta; }
+    .card.two-col .art-wrap { width: 240px; height: 240px; }
+    .card.two-col .lyrics.show { height: 300px; margin-top: 2px; }
+    .card.two-col .history-wrap { margin-top: 20px; border-top: none; padding-top: 0; }
+    .card.two-col .history { max-height: 300px; }
+  }
+  .side { min-width: 0; }
   /* 首屏显示的是本地缓存的上一首，标记为“更新中”(降透明度)，拉到实时数据后恢复。 */
   .card.stale { opacity: .5; }
-  .art-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 26px; }
+  .art-wrap { position: relative; width: 220px; height: 220px; max-width: 100%; margin: 0 auto 24px; }
   .art {
     width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
     box-shadow: 0 16px 48px rgba(0,0,0,.55), 0 0 30px -4px var(--accent, transparent);
@@ -147,6 +169,7 @@
 <body>
 <div id="bg"></div>
 <main class="card">
+  <div class="np">
   <div class="art-wrap">
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
   </div>
@@ -161,7 +184,6 @@
     <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
     <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
   </div>
-  <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
   <div id="links" class="links">
     <a id="lk-apple" class="ic" target="_blank" rel="noopener" aria-label="Apple Music" title="Apple Music" style="--c:#FA2D48">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03a12.5 12.5 0 001.57-.1c.822-.106 1.596-.35 2.295-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.045-1.773-.6-1.943-1.536a1.88 1.88 0 011.038-2.022c.323-.16.67-.25 1.018-.324.378-.082.758-.153 1.134-.24.274-.063.457-.23.51-.516a.904.904 0 00.02-.193c0-1.815 0-3.63-.002-5.443a.725.725 0 00-.026-.185c-.04-.15-.15-.243-.304-.234-.16.01-.318.035-.475.066-.76.15-1.52.303-2.28.456l-2.325.47-1.374.278c-.016.003-.032.01-.048.013-.277.077-.377.203-.39.49-.002.042 0 .086 0 .13-.002 2.602 0 5.204-.003 7.805 0 .42-.047.836-.215 1.227-.278.64-.77 1.04-1.434 1.233-.35.1-.71.16-1.075.172-.96.036-1.755-.6-1.92-1.544-.14-.812.23-1.685 1.154-2.075.357-.15.73-.232 1.108-.31.287-.06.575-.116.86-.177.383-.083.583-.323.6-.714v-.15c0-2.96 0-5.922.002-8.882 0-.123.013-.25.042-.37.07-.285.273-.448.546-.518.255-.066.515-.112.774-.165.733-.15 1.466-.296 2.2-.444l2.27-.46c.67-.134 1.34-.27 2.01-.403.22-.043.442-.088.663-.106.31-.025.523.17.554.482.008.073.012.148.012.223.002 1.91.002 3.822 0 5.732z"/></svg>
@@ -176,10 +198,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
+  </div><!-- /.np -->
+  <div class="side">
+  <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
   <div id="history-wrap" class="history-wrap hidden">
     <div class="history-title">最近播放</div>
     <div id="history" class="history"></div>
   </div>
+  </div><!-- /.side -->
   <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
 </main>
 <script>
@@ -318,7 +344,7 @@
   }
   function renderHistory(items) {
     const box = el('history'), wrap = el('history-wrap');
-    if (!items.length) { wrap.classList.add('hidden'); return; }
+    if (!items.length) { wrap.classList.add('hidden'); updateLayout(); return; }
     box.textContent = '';
     for (const it of items) {
       const a = document.createElement('a');
@@ -329,6 +355,7 @@
       a.appendChild(t); a.appendChild(ar); box.appendChild(a);
     }
     wrap.classList.remove('hidden');
+    updateLayout();
   }
 
   function paintIdle(msg) {
@@ -366,17 +393,25 @@
   }
   function setLyrics(text, playing, sameTrack) {
     const wrap = el('lyrics'), inner = el('lyrics-inner');
-    if (!playing) { wrap.classList.remove('show'); return; } // 只在播放时显示(才可同步)
-    if (!sameTrack || !lrcLines.length) {
-      const parsed = parseLRC(text);
-      inner.textContent = ''; lrcActive = -1; inner.style.transform = 'translateY(0)';
-      if (!parsed.length) { lrcLines = []; wrap.classList.remove('show'); return; }
-      lrcLines = parsed.map(p => {
-        const d = document.createElement('div'); d.className = 'lrc-line'; d.textContent = p.text;
-        inner.appendChild(d); return { t: p.t, el: d };
-      });
+    let show = false;
+    if (playing) { // 只在播放时显示(才可同步)
+      if (!sameTrack || !lrcLines.length) {
+        const parsed = parseLRC(text);
+        inner.textContent = ''; lrcActive = -1; inner.style.transform = 'translateY(0)';
+        lrcLines = parsed.map(p => {
+          const d = document.createElement('div'); d.className = 'lrc-line'; d.textContent = p.text;
+          inner.appendChild(d); return { t: p.t, el: d };
+        });
+      }
+      show = lrcLines.length > 0;
     }
-    wrap.classList.add('show');
+    wrap.classList.toggle('show', show);
+    updateLayout();
+  }
+  // 有侧栏内容(歌词/历史)时才在宽屏铺两栏；纯空闲(无历史)保持单列居中小卡。
+  function updateLayout() {
+    const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden');
+    document.querySelector('.card').classList.toggle('two-col', hasSide);
   }
   function syncLyrics(posMs) {
     if (!lrcLines.length) return;
