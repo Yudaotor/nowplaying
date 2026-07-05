@@ -280,8 +280,10 @@
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
   const POLL_MS = 6000;
-  // 默认直连 ListenBrainz(主用户在国内，EdgeOne 港区节点对国内 401、纯绕一趟)。
-  // 想走 EdgeOne 中转(海外更快)可 ?api=https://nowplaying-gxrbezuy.edgeone.dev。
+  // 主数据源:自建状态中继(Cloudflare Worker+KV,采集器直推,国内可达且不受 LB 抽风影响)。
+  // 读 /now(当前)+ /history(历史)。可 ?relay= 覆盖;设 ?relay=off 则退回直连 LB。
+  const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || 'https://np.yudaotor.me'; })();
+  // 旧的 EdgeOne 中转入口(保留兼容,一般不用)。
   const API_BASE = params.get('api') || '';
 
   const el = id => document.getElementById(id);
@@ -423,17 +425,27 @@
   // 缩略图可点(跳该歌的 Apple/网易云)。每 30s 刷一次。
   async function fetchHistory() {
     if (USER === 'CHANGE_ME') return;
+    // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
+    // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
+    if (RELAY) {
+      try {
+        const d = await fetchJSON(`${RELAY}/history`, 8000);
+        if (d && d.ok && Array.isArray(d.items) && d.items.length) {
+          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '' })));
+          renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
+          return;
+        }
+      } catch (e) { /* 中继不通 → LB 兜底 */ }
+    }
     try {
       const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, 12000);
       const listens = (re.payload && re.payload.listens) || [];
-      const items = [];
-      for (const l of listens) {
-        const m = l.track_metadata || {}; const ai = m.additional_info || {};
-        if (!m.track_name) continue;
-        items.push({ title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' });
-      }
-      renderHistory(items);
-      renderTodayStat(await collectTodayListens(listens));
+      renderHistory(listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
+        const m = l.track_metadata, ai = m.additional_info || {};
+        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' };
+      }));
+      const today = await collectTodayListens(listens);
+      renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
     } catch (e) {}
   }
   // 收集「今天」的全部 listen 用于统计。LB 单次最多 100 条，超过就用 max_ts 往前翻页，
@@ -454,19 +466,19 @@
     }
     return acc;
   }
-  // 今日收听统计:按本地当天 0 点过滤 listened_at(电脑+手机的完成收听都进 LB 带时间戳)。
-  // 时长优先用各 listen 的 duration_ms;iPhone 经 Last.fm 桥接的没有时长(Last.fm 不给),
-  // 用当天已知时长的均值补估、并标"约",不假装精确。
-  function renderTodayStat(listens) {
+  // 今日收听统计:输入归一化条目 [{listenedAt(秒), durationMs}]。按本地当天 0 点过滤。
+  // 时长优先用各条 durationMs;iPhone 经 Last.fm 桥接的没有时长,用当天已知时长的均值补估、
+  // 并标"约",不假装精确。
+  function renderTodayStat(items) {
     const stat = el('today-stat');
     if (!stat) return;
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
     const cutoff = Math.floor(midnight.getTime() / 1000);
     let count = 0, knownMs = 0, knownN = 0, unknownN = 0;
-    for (const l of listens) {
-      if ((l.listened_at || 0) < cutoff) continue;
+    for (const it of items) {
+      if ((it.listenedAt || 0) < cutoff) continue;
       count++;
-      const dm = (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms;
+      const dm = it.durationMs;
       if (typeof dm === 'number' && dm > 0) { knownMs += dm; knownN++; } else { unknownN++; }
     }
     if (!count) { stat.textContent = ''; return; }
@@ -654,9 +666,22 @@
     finally { clearTimeout(to); }
   }
 
-  // 取一次状态：优先 EdgeOne /now（海外快），失败/国内401则回退直连 LB。
-  // 返回 状态对象 / {empty:true} / null(彻底失败，此时不要清屏，保留上一首)。
+  // 取一次状态：优先自建中继 /now(采集器直推、国内可达、不受 LB 抽风影响);中继本身
+  // 连不上(极端:CF 被墙)才回退直连 LB。返回 状态对象 / {empty:true} / null。
   async function fetchState() {
+    if (RELAY) {
+      try {
+        const d = await fetchJSON(`${RELAY}/now`, 4000);
+        if (d && d.ok && !d.empty && d.title) {
+          return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt,
+            artwork: d.artwork || '', accent: d.accent || '', source: d.device || '',
+            lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
+            durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
+            links: d.links || {} };
+        }
+        if (d && d.empty) return { empty: true };
+      } catch (e) { /* 中继不通 → 落到下面 LB 兜底 */ }
+    }
     if (API_BASE) {
       try {
         // EdgeOne 在国内会 401/慢，加 2.5s 超时快速回退直连 LB，别让它拖慢每次轮询。
