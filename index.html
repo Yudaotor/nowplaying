@@ -306,7 +306,7 @@
   const params = new URLSearchParams(location.search);
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
-  const POLL_MS = 6000;
+  const POLL_MS = 10000; // 进度/歌词客户端外推,轮询只为换歌/暂停等状态,放宽到 10s 省 KV 读额度
   // 主数据源:自建状态中继(Cloudflare Worker+KV,采集器直推,国内可达且不受 LB 抽风影响)。
   // 读 /now(当前)+ /history(历史)。可 ?relay= 覆盖;设 ?relay=off 则退回直连 LB。
   const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || 'https://np.yudaotor.me'; })();
@@ -663,6 +663,7 @@
         // 抗时钟偏差:优先用服务器锚点年龄 + 本设备相对差(见 frame)。
         baseAgeMs: (typeof s.ageMs === 'number' ? s.ageMs : null),
         fetchedAt: (typeof s.fetchedAt === 'number' ? s.fetchedAt : null),
+        fresh: !!s.relayFresh, // 来自中继 KV(准确)→ 不限龄外推;否则 lb 兜底 → 封顶
       };
       el('progress').classList.add('show');
     } else {
@@ -683,8 +684,10 @@
       const ageMs = (pb.baseAgeMs != null && pb.fetchedAt != null)
         ? pb.baseAgeMs + (Date.now() - pb.fetchedAt)
         : (Date.now() - pb.progressTs);
-      // 仅锚点新鲜(0~90s)时外推;异常陈旧则冻结在锚点位置,不让坏锚点把进度条冲到远超实际。
-      if (pb.rate > 0 && ageMs > 0 && ageMs < 90000) pos += ageMs * pb.rate;
+      // kv 锚点(采集器直推、准确)不限龄外推——连播中途采集器不重写锚点也能一路走对,省 KV 写额度;
+      // 只有 lb 兜底锚点(可能陈旧)才封顶 90s,防坏锚点把进度条冲到远超实际。
+      const cap = pb.fresh ? Infinity : 90000;
+      if (pb.rate > 0 && ageMs > 0 && ageMs < cap) pos += ageMs * pb.rate;
       pos = Math.max(0, Math.min(pb.durationMs, pos));
       el('bar-fill').style.width = (pb.durationMs > 0 ? (pos / pb.durationMs) * 100 : 0) + '%';
       const sec = Math.floor(pos / 1000);
@@ -719,7 +722,7 @@
             lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
             // 服务器算的锚点年龄 + 本设备收到的时刻:据此外推不依赖本设备绝对时钟(消除跨设备时钟偏差)。
-            ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(),
+            ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(), relayFresh: d.source === 'kv',
             links: d.links || {} };
         }
         if (d && d.empty) return { empty: true };
