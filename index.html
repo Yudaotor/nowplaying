@@ -272,7 +272,7 @@
     <div id="history" class="history"></div>
   </div>
   </div><!-- /.side -->
-  <div class="meta">数据来自 <a id="lb-link" href="https://listenbrainz.org" target="_blank" rel="noopener">ListenBrainz</a> · Apple Music</div>
+  <div class="meta">Apple Music · 封面歌词来自网易云</div>
 </main>
 <script>
 (() => {
@@ -287,7 +287,6 @@
   const API_BASE = params.get('api') || '';
 
   const el = id => document.getElementById(id);
-  el('lb-link').href = `https://listenbrainz.org/user/${encodeURIComponent(USER)}/`;
 
   const artCache = new Map();
   async function artworkFor(artist, title) {
