@@ -182,12 +182,16 @@
     display: flex; justify-content: space-between; margin-top: 8px;
     font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
   }
-  /* 同步歌词：固定高度视口，内层整体位移把当前行滚到中间，上下渐隐遮罩。 */
-  .lyrics { display: none; margin-top: 20px; height: 132px; overflow: hidden; position: relative;
+  /* 同步歌词：固定高度视口，原生滚动把当前行滚到中间(可手动滑动)，上下渐隐遮罩。 */
+  .lyrics { display: none; margin-top: 20px; height: 132px; overflow-y: auto; overflow-x: hidden;
+    position: relative; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* 可手动滑动，但隐藏滚动条保持干净 */
     -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
             mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
+  .lyrics::-webkit-scrollbar { display: none; }
   .lyrics.show { display: block; }
-  .lyrics-inner { transition: transform .45s cubic-bezier(.22,.61,.36,1); will-change: transform; }
+  /* 上下留白 ≈ 半个视口，好让首行/末行也能滚到正中央(自动跟随与手动滑动共用)。 */
+  .lyrics-inner { padding: 150px 0; }
   /* 每个歌词行可含三小行：罗马音(上)/原文(中)/翻译(下)。原文可逐字(yrc)或整行高亮。 */
   .lrc-line { padding: 6px 0; transition: opacity .3s ease; opacity: .5; overflow-wrap: anywhere; }
   .lrc-line.active { opacity: 1; }
@@ -553,6 +557,31 @@
   // 位置高亮当前行、有逐字则逐字点亮，并整体位移把当前行滚到中间。
   let lrcLines = [];   // [{t, el, words:[{t,el}]|null}]
   let lrcActive = -1;
+  // 手动滑动:用户一滚(滚轮/触摸)就暂停自动跟随;停手 LRC_RESUME_MS 后平滑滚回当前行居中。
+  let lrcUserScrolling = false, lrcUserTimer = null;
+  const LRC_RESUME_MS = 2600;
+  const lrcSmooth = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function lrcScrollActive(smooth) {
+    const box = el('lyrics');
+    const i = lrcActive >= 0 ? lrcActive : 0;
+    const a = lrcLines[i] && lrcLines[i].el;
+    if (!a) return;
+    const top = Math.max(0, a.offsetTop + a.clientHeight / 2 - box.clientHeight / 2);
+    box.scrollTo({ top, behavior: smooth && lrcSmooth() ? 'smooth' : 'auto' });
+  }
+  function lrcOnUserScroll() {
+    lrcUserScrolling = true;
+    if (lrcUserTimer) clearTimeout(lrcUserTimer);
+    lrcUserTimer = setTimeout(() => { lrcUserScrolling = false; lrcScrollActive(true); }, LRC_RESUME_MS);
+  }
+  (function bindLyricScroll() {
+    const lw = el('lyrics');
+    if (!lw) return;
+    // 只认真正的用户输入(滚轮/触摸),不听 scroll 事件 → 天然区分「程序自动滚」与「用户滚」。
+    lw.addEventListener('wheel', lrcOnUserScroll, { passive: true });
+    lw.addEventListener('touchstart', lrcOnUserScroll, { passive: true });
+    lw.addEventListener('touchmove', lrcOnUserScroll, { passive: true });
+  })();
   function parseLRC(text) {
     const out = [];
     for (const raw of (text || '').split('\n')) {
@@ -595,7 +624,8 @@
       if (!sameTrack || !lrcLines.length) {
         const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
         const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
-        inner.textContent = ''; lrcActive = -1; inner.style.transform = 'translateY(0)';
+        inner.textContent = ''; lrcActive = -1;
+        wrap.scrollTop = 0; lrcUserScrolling = false; if (lrcUserTimer) clearTimeout(lrcUserTimer);
         lrcLines = base.map(ln => {
           const line = document.createElement('div'); line.className = 'lrc-line';
           const rm = nearestText(roma, ln.t, 700);
@@ -629,12 +659,8 @@
     if (idx !== lrcActive) {
       if (lrcActive >= 0) lrcLines[lrcActive].el.classList.remove('active');
       lrcActive = idx;
-      if (idx >= 0) {
-        const a = lrcLines[idx].el, box = el('lyrics');
-        a.classList.add('active');
-        const y = a.offsetTop + a.clientHeight / 2 - box.clientHeight / 2;
-        el('lyrics-inner').style.transform = `translateY(${-Math.max(0, y)}px)`;
-      } else { el('lyrics-inner').style.transform = 'translateY(0)'; }
+      if (idx >= 0) lrcLines[idx].el.classList.add('active');
+      if (!lrcUserScrolling) lrcScrollActive(true); // 手动滑动期间不抢滚动,停手后再回中
     }
     // 逐字渐变填色(只处理当前行):每个词按 (posMs-词始)/词长 算填充比例 0~100%,
     // 平滑扫过。已过的词=100,未到=0,当前词=部分。用 --fill 驱动 CSS 渐变。
