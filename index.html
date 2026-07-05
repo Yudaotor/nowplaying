@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- 预热连接:提前和 LB(德国、高延迟)/网易云图床握手,省首次请求的 TLS 往返。 -->
-<link rel="preconnect" href="https://api.listenbrainz.org" crossorigin>
+<!-- 预热连接:提前和自建中继(主数据源)/网易云图床握手,省首屏 /now 的 TLS 往返;LB 已降级为兜底,仅 dns-prefetch。 -->
+<link rel="preconnect" href="https://np.yudaotor.me" crossorigin>
+<link rel="dns-prefetch" href="https://api.listenbrainz.org">
 <link rel="dns-prefetch" href="https://p1.music.126.net">
 <link rel="dns-prefetch" href="https://p2.music.126.net">
 <link rel="dns-prefetch" href="https://p3.music.126.net">
@@ -520,9 +521,15 @@
     const approx = unknownN > 0 ? '约 ' : '';
     stat.textContent = `今日 · ${count} 首 · ${approx}${dur}`;
   }
+  let historySig = ''; // 上次渲染的历史列表签名;内容没变就跳过重建
   function renderHistory(items) {
     const box = el('history'), wrap = el('history-wrap');
-    if (!items.length) { wrap.classList.add('hidden'); updateLayout(); return; }
+    if (!items.length) { wrap.classList.add('hidden'); historySig = ''; updateLayout(); return; }
+    // 内容没变就整体跳过——否则每 60s / 每次切回标签都会清零用户滚动位置 + 白重建几百个 DOM。
+    const sig = items.map(it => `${it.title}|${it.artist}|${it.url || ''}`).join('\n');
+    if (sig === historySig && !wrap.classList.contains('hidden')) return;
+    const prevTop = box.scrollTop; // 确需重建时先记住滚动位置,建完还原
+    historySig = sig;
     box.textContent = '';
     for (const it of items) {
       const a = document.createElement('a');
@@ -532,6 +539,7 @@
       const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
       a.appendChild(t); a.appendChild(ar); box.appendChild(a);
     }
+    box.scrollTop = prevTop;
     wrap.classList.remove('hidden');
     updateLayout();
   }
