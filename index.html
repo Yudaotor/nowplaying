@@ -10,6 +10,14 @@
 <link rel="dns-prefetch" href="https://p2.music.126.net">
 <link rel="dns-prefetch" href="https://p3.music.126.net">
 <title>正在听什么 ♪</title>
+<!-- 社交解链:粘 github.io 链接显示动态封面(/cover)+通用标题;要完整动态标题用 np.yudaotor.me/share -->
+<meta property="og:type" content="music.song">
+<meta property="og:title" content="正在听什么 ♪">
+<meta property="og:description" content="看看我此刻在听的歌 · Apple Music">
+<meta property="og:image" content="https://np.yudaotor.me/cover">
+<meta property="og:url" content="https://yudaotor.github.io/nowplaying/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://np.yudaotor.me/cover">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <style>
   :root { color-scheme: dark; }
@@ -252,6 +260,15 @@
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
+  /* 试听按钮:封面右下角小圆钮,点了才加载播放 iTunes 30s 预览。 */
+  .preview-btn { position: absolute; right: 8px; bottom: 8px; z-index: 6;
+    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.5); color: #fff; font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 4px 14px rgba(0,0,0,.4); transition: transform .15s ease, background .2s ease; }
+  .preview-btn:hover { background: var(--accent, rgba(0,0,0,.75)); transform: scale(1.08); }
+  .preview-btn.playing { background: var(--accent, #1db954); }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -266,6 +283,7 @@
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
     <div class="spindle"></div>
     <div class="tonearm"><div class="pivot"></div><div class="bar"></div><div class="head"></div></div>
+    <button id="preview-btn" class="preview-btn hidden" aria-label="试听 30 秒" title="试听 30 秒（iTunes 预览）">▶</button>
   </div>
   <div id="status" class="status">
     <span class="eq"><span></span><span></span><span></span></span>
@@ -294,6 +312,7 @@
     </a>
   </div>
   </div><!-- /.np -->
+  <audio id="preview-audio" preload="none"></audio>
   <div class="side">
   <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
   <div id="history-wrap" class="history-wrap hidden">
@@ -338,6 +357,38 @@
       try { if (url) localStorage.setItem(key, url); } catch (e) {}
       return url;
     } catch (e) { return ''; }
+  }
+
+  // 30 秒试听:iTunes 每首歌带 previewUrl(与封面查询同源、免 key)。封面角放▶钮,点了才
+  // 加载播放(自动播放策略要求用户手势触发);切歌自动停。preview 可能非同版本,取不到就藏钮。
+  const previewCache = new Map();
+  async function previewFor(artist, title) {
+    const key = `prev:${artist}|${title}`;
+    if (previewCache.has(key)) return previewCache.get(key);
+    try { const c = localStorage.getItem(key); if (c !== null) { previewCache.set(key, c); return c; } } catch (e) {}
+    try {
+      const q = encodeURIComponent(`${artist} ${title}`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+      const data = await res.json();
+      const url = (data.results && data.results[0] && data.results[0].previewUrl) || '';
+      previewCache.set(key, url);
+      try { localStorage.setItem(key, url); } catch (e) {}
+      return url;
+    } catch (e) { return ''; }
+  }
+  let curPreviewUrl = '';
+  function resetPreview() {
+    const a = el('preview-audio'), btn = el('preview-btn');
+    if (a) { a.pause(); a.removeAttribute('src'); try { a.load(); } catch (e) {} }
+    if (btn) { btn.classList.remove('playing'); btn.classList.add('hidden'); btn.textContent = '▶'; }
+    curPreviewUrl = '';
+  }
+  async function loadPreview(artist, title, key) {
+    const url = await previewFor(artist, title);
+    if (key !== curKey) return; // 切歌了,丢弃这次结果
+    curPreviewUrl = url;
+    const btn = el('preview-btn');
+    if (btn) btn.classList.toggle('hidden', !url);
   }
 
   function relTime(unixSecs) {
@@ -385,6 +436,8 @@
     curKey = key;
     let art = s.artwork || '';
     if (!sameTrack) {
+      resetPreview();
+      loadPreview(artist, title, key);
       const imgEl = el('art');
       if (!art) { imgEl.style.opacity = .3; art = await artworkFor(artist, title); if (key !== curKey) return; }
       if (art) { imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`; }
@@ -555,6 +608,7 @@
     el('album').textContent = '';
     setProgress(null);
     setLyrics(null, false, false);
+    resetPreview();
     setLinks({});
     setAccent('');
     setStale(false);
@@ -824,6 +878,22 @@
     // 但首屏的“更新中…”不能一直挂着，把缓存那首按上次播放正常显示（后台继续重试）。
     if (!everRendered) paintIdle('连接中…稍后自动重试'); else await revertStale();
   }
+
+  // 试听按钮:点击切播放/暂停(首次点击才真正加载音频,满足自动播放手势要求)。
+  (function initPreview() {
+    const btn = el('preview-btn'), a = el('preview-audio');
+    if (!btn || !a) return;
+    btn.addEventListener('click', () => {
+      if (!curPreviewUrl) return;
+      if (a.paused) {
+        if (a.src !== curPreviewUrl) a.src = curPreviewUrl;
+        a.play().catch(() => {});
+      } else { a.pause(); }
+    });
+    a.addEventListener('play', () => { btn.textContent = '⏸'; btn.classList.add('playing'); });
+    a.addEventListener('pause', () => { btn.textContent = '▶'; btn.classList.remove('playing'); });
+    a.addEventListener('ended', () => { btn.textContent = '▶'; btn.classList.remove('playing'); });
+  })();
 
   // 黑胶 / 方形 切换(记忆到 localStorage，右上角小圆钮)。
   (function initVinyl() {
