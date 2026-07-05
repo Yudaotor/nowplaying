@@ -195,9 +195,21 @@
   .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
   .lrc-line.active .lrc-main { color: var(--accent, #f2f4f7); } /* 行级高亮(无逐字时) */
   .lrc-tr { font-size: 12px; line-height: 1.25; color: #838a97; margin-top: 1px; font-weight: 400; }
-  .lrc-w { color: #7f8794; transition: color .18s ease; }       /* 逐字:未唱 */
-  .lrc-line.active .lrc-w { color: #aab0bc; }                    /* 当前行未唱 */
-  .lrc-line.active .lrc-w.sung { color: var(--accent, #fff); }   /* 已唱 */
+  /* 逐字(yrc):每个词随时间从左到右"渐变扫过"填色,而不是整词硬切。--fill(0~100%)由
+     syncLyrics 每帧更新,渐变里留一段软过渡区(±9%),看起来是慢慢填满这个词。 */
+  .lrc-w { color: #7f8794; }
+  .lrc-line.active .lrc-w {
+    --fill: 0%;
+    background-image: linear-gradient(90deg,
+      var(--accent, #fff) 0, var(--accent, #fff) calc(var(--fill) - 9%),
+      #99a0ad calc(var(--fill) + 9%), #99a0ad 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lrc-line.active .lrc-w { background-image: none; -webkit-text-fill-color: currentColor; color: #aab0bc; }
+    .lrc-line.active .lrc-w.sung { color: var(--accent, #fff); }
+  }
   @media (prefers-reduced-motion: reduce) { .lyrics-inner { transition: none; } }
   .links {
     display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
@@ -565,7 +577,7 @@
       const words = [];
       const re = /\((\d+),(\d+),\d+\)([^(]*)/g;
       let m;
-      while ((m = re.exec(raw))) { if (m[3] !== '') words.push({ t: +m[1], text: m[3] }); }
+      while ((m = re.exec(raw))) { if (m[3] !== '') words.push({ t: +m[1], dur: +m[2], text: m[3] }); }
       if (words.length) out.push({ t: +head[1], words });
     }
     return out.sort((a, b) => a.t - b.t);
@@ -591,7 +603,7 @@
           const main = document.createElement('div'); main.className = 'lrc-main';
           let words = null;
           if (ln.words) {
-            words = ln.words.map(w => { const sp = document.createElement('span'); sp.className = 'lrc-w'; sp.textContent = w.text; main.appendChild(sp); return { t: w.t, el: sp }; });
+            words = ln.words.map(w => { const sp = document.createElement('span'); sp.className = 'lrc-w'; sp.textContent = w.text; main.appendChild(sp); return { t: w.t, dur: w.dur || 0, el: sp }; });
           } else { main.textContent = ln.text; }
           line.appendChild(main);
           const tt = nearestText(tr, ln.t, 700);
@@ -624,10 +636,16 @@
         el('lyrics-inner').style.transform = `translateY(${-Math.max(0, y)}px)`;
       } else { el('lyrics-inner').style.transform = 'translateY(0)'; }
     }
-    // 逐字点亮(只处理当前行)
+    // 逐字渐变填色(只处理当前行):每个词按 (posMs-词始)/词长 算填充比例 0~100%,
+    // 平滑扫过。已过的词=100,未到=0,当前词=部分。用 --fill 驱动 CSS 渐变。
     const cur = idx >= 0 ? lrcLines[idx] : null;
     if (cur && cur.words) {
-      for (const w of cur.words) { const sung = w.t <= posMs; if (sung !== w._s) { w._s = sung; w.el.classList.toggle('sung', sung); } }
+      for (const w of cur.words) {
+        let f = w.dur > 0 ? (posMs - w.t) / w.dur : (posMs >= w.t ? 1 : 0);
+        f = f < 0 ? 0 : f > 1 ? 1 : f;
+        const pct = Math.round(f * 100);
+        if (pct !== w._f) { w._f = pct; w.el.style.setProperty('--fill', pct + '%'); }
+      }
     }
   }
 
@@ -774,7 +792,7 @@
   (function initVinyl() {
     const wrap = el('art-wrap'), btn = el('vinyl-toggle');
     const apply = on => { wrap.classList.toggle('vinyl', on); btn.classList.toggle('on', on); };
-    apply(localStorage.getItem('np:vinyl') === '1');
+    apply(localStorage.getItem('np:vinyl') !== '0'); // 默认黑胶;仅当用户显式关过('0')才方形
     btn.addEventListener('click', () => {
       const on = !wrap.classList.contains('vinyl');
       apply(on);
