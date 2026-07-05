@@ -102,17 +102,31 @@
   }
   .art.playing { animation: breathe 3.8s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) { .art.playing { animation: none; } }
-  /* ---- 黑胶模式(开关切换,存 localStorage)：封面变圆盘、播放时慢速旋转、叠凹槽+轴孔+唱臂 ---- */
-  .spindle, .tonearm { display: none; }
-  .art-wrap.vinyl .art { border-radius: 50%; }
+  /* ---- 黑胶模式(开关切换,存 localStorage)：外圈黑色带纹路胶片(静止),中心小圆放封面
+     当唱片标签(播放时旋转),叠中央轴孔 + 唱臂 ---- */
+  .disc, .spindle, .tonearm { display: none; }
+  /* 黑胶盘:黑色 + 细纹路凹槽,accent 光晕。中心留给封面标签。 */
+  .art-wrap.vinyl .disc {
+    display: block; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background:
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.05) 0 1px, transparent 1px 4px),
+      radial-gradient(circle at 50% 50%, #2b2b30 0 19%, #131316 20% 100%);
+    box-shadow: 0 16px 48px rgba(0,0,0,.6), 0 0 30px -4px var(--accent, transparent);
+  }
+  /* 专辑封面缩成中心小圆(唱片标签),播放时慢速旋转。 */
+  .art-wrap.vinyl .art {
+    position: absolute; left: 27%; top: 27%; width: 46%; height: 46%;
+    border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.55); z-index: 2;
+  }
   .art-wrap.vinyl .art.playing { animation: vinylspin 18s linear infinite; } /* 慢速 */
   @keyframes vinylspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .art.playing { animation: none; } }
+  /* 中央轴孔(静止,盖在标签中心)。 */
   .art-wrap.vinyl .spindle {
-    display: block; position: absolute; left: 50%; top: 50%; width: 15px; height: 15px;
-    transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, #12101c 0 32%, #c8cdd6 34% 60%, #12101c 62% 100%);
-    box-shadow: 0 0 0 3px rgba(0,0,0,.4);
+    display: block; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px;
+    transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; z-index: 3;
+    background: radial-gradient(circle, #d8dce2 0 36%, #12101c 42% 100%);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.5);
   }
   /* 唱臂:暂停时抬起(42°离盘)、播放时落到唱片外圈(8°)，平滑摆动。 */
   .art-wrap.vinyl .tonearm { display: block; position: absolute; top: 14px; right: 2px; width: 126px; height: 16px; transform-origin: right center; transform: rotate(42deg); transition: transform .6s ease; pointer-events: none; z-index: 3; }
@@ -231,6 +245,7 @@
   <button id="vinyl-toggle" class="vinyl-toggle" title="黑胶 / 方形 切换" aria-label="黑胶/方形切换">💿</button>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
+    <div class="disc"></div>
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
     <div class="spindle"></div>
     <div class="tonearm"><div class="pivot"></div><div class="bar"></div><div class="head"></div></div>
