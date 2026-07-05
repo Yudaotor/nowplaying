@@ -625,8 +625,11 @@
       pb = {
         durationMs: s.durationMs,
         progressMs: s.progressMs || 0,
-        progressTs: s.progressTs,
         rate: (s.rate == null ? 1 : s.rate),
+        progressTs: s.progressTs,        // 兜底(LB 直连路径无 ageMs 时用本机时钟)
+        // 抗时钟偏差:优先用服务器锚点年龄 + 本设备相对差(见 frame)。
+        baseAgeMs: (typeof s.ageMs === 'number' ? s.ageMs : null),
+        fetchedAt: (typeof s.fetchedAt === 'number' ? s.fetchedAt : null),
       };
       el('progress').classList.add('show');
     } else {
@@ -642,10 +645,12 @@
   function frame() {
     if (pb) {
       let pos = pb.progressMs;
-      // 外推:锚点每 ~20s 刷新。仅在锚点新鲜(0~90s)时外推——锚点异常陈旧(中继瞬时
-      // 回退到过期数据等)则冻结在锚点位置,不让坏锚点把进度条冲到远超实际;age 为负
-      // (查看设备时钟比采集器慢)也不倒扣。
-      const ageMs = Date.now() - pb.progressTs;
+      // 锚点真实年龄:优先"服务器算的年龄 + 本设备收到后走过的相对时间"(只用本设备时钟的
+      // 相对差,不看绝对时钟 → 跨设备时钟偏差不影响);无 ageMs(LB 直连)才退回本机绝对时钟。
+      const ageMs = (pb.baseAgeMs != null && pb.fetchedAt != null)
+        ? pb.baseAgeMs + (Date.now() - pb.fetchedAt)
+        : (Date.now() - pb.progressTs);
+      // 仅锚点新鲜(0~90s)时外推;异常陈旧则冻结在锚点位置,不让坏锚点把进度条冲到远超实际。
       if (pb.rate > 0 && ageMs > 0 && ageMs < 90000) pos += ageMs * pb.rate;
       pos = Math.max(0, Math.min(pb.durationMs, pos));
       el('bar-fill').style.width = (pb.durationMs > 0 ? (pos / pb.durationMs) * 100 : 0) + '%';
@@ -680,6 +685,8 @@
             artwork: d.artwork || '', accent: d.accent || '', source: d.device || '',
             lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
+            // 服务器算的锚点年龄 + 本设备收到的时刻:据此外推不依赖本设备绝对时钟(消除跨设备时钟偏差)。
+            ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(),
             links: d.links || {} };
         }
         if (d && d.empty) return { empty: true };
