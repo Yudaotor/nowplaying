@@ -144,16 +144,16 @@
   .tonearm .bar { position: absolute; right: 8px; top: 6px; width: 106px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, #c8cdd6, #8a91a0); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
   .tonearm .pivot { position: absolute; right: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle, #e6e9ee, #8a91a0); }
   .tonearm .head { position: absolute; left: 6px; top: 2px; width: 14px; height: 11px; border-radius: 2px; background: #e6e9ee; }
-  /* 切换按钮：卡片右上角小圆钮 */
-  .vinyl-toggle {
-    position: absolute; top: 14px; right: 14px; z-index: 4; width: 34px; height: 34px;
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  /* 卡片右上角工具钮组(主题/黑胶/沉浸),共享 .tool-btn 样式。 */
+  .tools { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 6px; }
+  .tool-btn {
+    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;
     border-radius: 50%; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06);
-    color: #9aa3b2; font-size: 16px; line-height: 1; transition: background .2s, color .2s, transform .1s;
+    color: #9aa3b2; font-size: 15px; line-height: 1; transition: background .2s, color .2s, transform .1s, opacity .2s;
     -webkit-tap-highlight-color: transparent;
   }
-  .vinyl-toggle:hover { background: rgba(255,255,255,.14); }
-  .vinyl-toggle.on { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
+  .tool-btn:hover { background: rgba(255,255,255,.14); }
+  .tool-btn.on { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
   .status {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 13px; font-weight: 600; letter-spacing: .4px;
@@ -269,6 +269,59 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.4); transition: transform .15s ease, background .2s ease; }
   .preview-btn:hover { background: var(--accent, rgba(0,0,0,.75)); transform: scale(1.08); }
   .preview-btn.playing { background: var(--accent, #1db954); }
+  /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / oled=纯黑 / light=浅色 ---- */
+  :root[data-theme="oled"] body { background: #000; }
+  :root[data-theme="oled"] #bg,
+  :root[data-theme="oled"] #flow { display: none; }
+  :root[data-theme="oled"] .card { background: rgba(255,255,255,.035); border-color: rgba(255,255,255,.08); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
+  :root[data-theme="light"] #bg { filter: blur(60px) saturate(1.5) brightness(1.02); opacity: .4; }
+  :root[data-theme="light"] #flow { opacity: .3; }
+  :root[data-theme="light"] .card { background: rgba(255,255,255,.74); border-color: rgba(0,0,0,.08); box-shadow: 0 24px 80px rgba(0,0,0,.22); }
+  :root[data-theme="light"] h1 { color: #1c1f26; }
+  :root[data-theme="light"] .artist { color: #3a404b; }
+  :root[data-theme="light"] .album,
+  :root[data-theme="light"] .times,
+  :root[data-theme="light"] .meta,
+  :root[data-theme="light"] .meta a,
+  :root[data-theme="light"] .history-title,
+  :root[data-theme="light"] .lrc-roma,
+  :root[data-theme="light"] .lrc-tr { color: #7a828f; }
+  :root[data-theme="light"] .status { background: rgba(0,0,0,.06); color: #5a616e; }
+  :root[data-theme="light"] .lrc-main { color: #5a616e; }
+  :root[data-theme="light"] .lrc-line.active .lrc-main { color: var(--accent, #1c1f26); }
+  :root[data-theme="light"] .lrc-w { color: #9aa1ad; }
+  :root[data-theme="light"] .bar { background: rgba(0,0,0,.12); }
+  :root[data-theme="light"] .history .h-title { color: #2a2e37; }
+  :root[data-theme="light"] .history .h-artist { color: #7a828f; }
+  :root[data-theme="light"] .history a:hover { background: rgba(0,0,0,.05); }
+  :root[data-theme="light"] .history-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .ic { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
+  :root[data-theme="light"] .ic:hover { background: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .tool-btn { color: #5a616e; border-color: rgba(0,0,0,.14); background: rgba(0,0,0,.05); }
+  /* ---- 沉浸/全屏模式(data-immersive):溶解卡片、放大封面+歌词、隐藏杂项,适合平板/副屏常驻 ---- */
+  :root[data-immersive] body { padding: 0; }
+  :root[data-immersive] .tools { top: 18px; right: 18px; opacity: .3; }
+  :root[data-immersive] .tools:hover { opacity: 1; }
+  :root[data-immersive] .card,
+  :root[data-immersive] .card.two-col { width: min(96vw, 1200px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: none; padding: 3vh 4vw; }
+  :root[data-immersive] .links,
+  :root[data-immersive] .history-wrap,
+  :root[data-immersive] .meta,
+  :root[data-immersive] .album { display: none; }
+  :root[data-immersive] .art-wrap { width: min(40vh, 360px); height: min(40vh, 360px); }
+  :root[data-immersive] h1 { font-size: clamp(24px, 3.4vw, 40px); }
+  :root[data-immersive] .artist { font-size: clamp(15px, 1.8vw, 22px); }
+  :root[data-immersive] .lyrics.show { height: min(52vh, 560px); }
+  :root[data-immersive] .lrc-main { font-size: clamp(16px, 1.9vw, 26px); line-height: 1.4; }
+  :root[data-immersive] .lrc-tr { font-size: clamp(13px, 1.4vw, 18px); }
+  :root[data-immersive] .lrc-roma { font-size: clamp(12px, 1.2vw, 15px); }
+  @media (min-width: 820px) {
+    :root[data-immersive] .card.two-col { grid-template-columns: min(40vh, 400px) minmax(0, 1fr); column-gap: 6vw; align-items: center; }
+    :root[data-immersive] .card.two-col .art-wrap { width: min(40vh, 400px); height: min(40vh, 400px); }
+    :root[data-immersive] .card.two-col .lyrics.show { height: min(58vh, 620px); }
+  }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -276,7 +329,11 @@
 <div id="bg"></div>
 <div id="flow"></div>
 <main class="card">
-  <button id="vinyl-toggle" class="vinyl-toggle" title="黑胶 / 方形 切换" aria-label="黑胶/方形切换">💿</button>
+  <div class="tools">
+    <button id="theme-toggle" class="tool-btn" title="主题：氛围 / 纯黑 / 浅色（点击切换）" aria-label="切换主题">🌗</button>
+    <button id="vinyl-toggle" class="tool-btn" title="黑胶 / 方形 切换" aria-label="黑胶/方形切换">💿</button>
+    <button id="fs-toggle" class="tool-btn" title="沉浸 / 全屏模式" aria-label="沉浸全屏模式">⛶</button>
+  </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
     <div class="disc"></div>
@@ -904,6 +961,49 @@
       const on = !wrap.classList.contains('vinyl');
       apply(on);
       try { localStorage.setItem('np:vinyl', on ? '1' : '0'); } catch (e) {}
+    });
+  })();
+
+  // 主题切换(氛围/纯黑/浅色,记忆到 localStorage,右上角 🌗 钮)。
+  (function initTheme() {
+    const btn = el('theme-toggle');
+    if (!btn) return;
+    const THEMES = ['auto', 'oled', 'light'];
+    const ICON = { auto: '🌗', oled: '🌑', light: '☀️' };
+    const LABEL = { auto: '氛围', oled: '纯黑', light: '浅色' };
+    const apply = t => {
+      const root = document.documentElement;
+      if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+      btn.textContent = ICON[t] || '🌗';
+      btn.title = '主题：' + (LABEL[t] || '氛围') + '（点击切换）';
+    };
+    let cur = localStorage.getItem('np:theme');
+    if (!THEMES.includes(cur)) cur = 'auto';
+    apply(cur);
+    btn.addEventListener('click', () => {
+      cur = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+      apply(cur);
+      try { localStorage.setItem('np:theme', cur); } catch (e) {}
+    });
+  })();
+
+  // 沉浸/全屏模式(⛶ 钮:溶解卡片、放大封面歌词、隐藏杂项 + 尝试浏览器全屏)。不持久化(全屏需手势),
+  // 全屏失败(如 iPhone Safari)仍套用沉浸布局;用户按 Esc 退全屏时同步退沉浸。
+  (function initImmersive() {
+    const btn = el('fs-toggle');
+    if (!btn) return;
+    const root = document.documentElement;
+    const setOn = on => { root.toggleAttribute('data-immersive', on); btn.classList.toggle('on', on); };
+    btn.addEventListener('click', () => {
+      const on = !root.hasAttribute('data-immersive');
+      setOn(on);
+      try {
+        if (on) { if (root.requestFullscreen) root.requestFullscreen().catch(() => {}); }
+        else if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      } catch (e) {}
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && root.hasAttribute('data-immersive')) setOn(false);
     });
   })();
 
