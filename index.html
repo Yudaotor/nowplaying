@@ -257,6 +257,7 @@
   .history a:hover { background: rgba(255,255,255,.06); }
   .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-artist { flex-shrink: 0; max-width: 42%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-dev { flex-shrink: 0; font-size: 11px; opacity: .5; line-height: 1; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -584,7 +585,7 @@
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
-          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '' })));
+          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '' })));
           renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
           return;
         }
@@ -595,7 +596,7 @@
       const listens = (re.payload && re.payload.listens) || [];
       renderHistory(listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
         const m = l.track_metadata, ai = m.additional_info || {};
-        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '' };
+        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '' };
       }));
       const today = await collectTodayListens(listens);
       renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
@@ -648,7 +649,7 @@
     const box = el('history'), wrap = el('history-wrap');
     if (!items.length) { wrap.classList.add('hidden'); historySig = ''; updateLayout(); return; }
     // 内容没变就整体跳过——否则每 60s / 每次切回标签都会清零用户滚动位置 + 白重建几百个 DOM。
-    const sig = items.map(it => `${it.title}|${it.artist}|${it.url || ''}`).join('\n');
+    const sig = items.map(it => `${it.title}|${it.artist}|${it.url || ''}|${it.device || ''}`).join('\n');
     if (sig === historySig && !wrap.classList.contains('hidden')) return;
     const prevTop = box.scrollTop; // 确需重建时先记住滚动位置,建完还原
     historySig = sig;
@@ -657,6 +658,8 @@
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
+      const dev = it.device === 'iphone' ? '📱' : it.device === 'mac' ? '💻' : '';
+      if (dev) { const d = document.createElement('span'); d.className = 'h-dev'; d.textContent = dev; d.title = it.device === 'iphone' ? 'iPhone' : 'Mac'; a.appendChild(d); }
       const t = document.createElement('span'); t.className = 'h-title'; t.textContent = it.title;
       const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
       a.appendChild(t); a.appendChild(ar); box.appendChild(a);
