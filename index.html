@@ -163,7 +163,8 @@
   .status.live { background: rgba(48, 209, 88, .16); color: #30d158; }
   .eq { display: none; align-items: flex-end; gap: 2px; height: 12px; }
   .status.live .eq { display: inline-flex; }
-  .device-icon { font-size: 12px; opacity: .85; line-height: 1; }
+  .device-icon { display: inline-flex; align-items: center; opacity: .9; line-height: 1; }
+  .device-icon svg { width: 13px; height: 13px; display: block; }
   .device-icon:empty { display: none; }
   .eq span {
     width: 3px; border-radius: 1px; background: #30d158;
@@ -494,8 +495,8 @@
     el('status-text').textContent = live ? '正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
-    // 设备来源:📱 iPhone / 💻 Mac(采集器打的 source 标)。未知则不显示。
-    el('device-icon').textContent = s.source === 'iphone' ? '📱' : s.source === 'mac' ? '💻' : '';
+    // 设备来源:笔记本=Mac / 手机=iPhone 线描图标(同款 DEV_ICON,currentColor 跟随状态胶囊:播放绿/暂停灰)。未知不显示。
+    el('device-icon').innerHTML = DEV_ICON[s.source] || '';
     el('device-icon').title = s.source === 'iphone' ? 'iPhone' : s.source === 'mac' ? 'Mac' : '';
     el('title').textContent = title;
     el('artist').textContent = artist;
