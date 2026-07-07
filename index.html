@@ -964,9 +964,11 @@
   async function tick() {
     if (USER === 'CHANGE_ME') { paintIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
     const s = await fetchState();
-    // 空闲态(拿到的是 LB 的“上次播放”而非正在播放)：若我们最近看到过一首正在播放的、
-    // 且比这条 LB listen 更近，就显示那首——避免回退到更旧、只因它满了 scrobble 阈值的歌。
-    if (s && !s.empty && !s.playing) {
+    // 空闲态兜底只在"纯历史的上次播放"(current!==true,如 LB fallback 给的旧记录)时才
+    // 跟本地缓存比新旧——current===true 代表 Mac/iPhone 此刻活跃的曲目(哪怕暂停),是当下
+    // 真相,必须直接显示,不能因为它没有 listenedAt(暂停曲目没有"收听于何时"这回事,语义上
+    // 合理)就被误判成"数据不可信"从而被本地缓存里几天前的旧记录顶替。
+    if (s && !s.empty && !s.playing && s.current !== true) {
       const lv = loadLive();
       if (lv && lv.seenAt && `${lv.artist}|${lv.title}` !== `${s.artist}|${s.title}`
           && (!s.listenedAt || lv.seenAt / 1000 > s.listenedAt)) {
