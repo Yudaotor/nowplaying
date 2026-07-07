@@ -269,11 +269,7 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.4); transition: transform .15s ease, background .2s ease; }
   .preview-btn:hover { background: var(--accent, rgba(0,0,0,.75)); transform: scale(1.08); }
   .preview-btn.playing { background: var(--accent, #1db954); }
-  /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / oled=纯黑 / light=浅色 ---- */
-  :root[data-theme="oled"] body { background: #000; }
-  :root[data-theme="oled"] #bg,
-  :root[data-theme="oled"] #flow { display: none; }
-  :root[data-theme="oled"] .card { background: rgba(255,255,255,.035); border-color: rgba(255,255,255,.08); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / light=浅色 ---- */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
   :root[data-theme="light"] #bg { filter: blur(60px) saturate(1.5) brightness(1.02); opacity: .4; }
@@ -321,6 +317,22 @@
     :root[data-immersive] .card.two-col { grid-template-columns: min(40vh, 400px) minmax(0, 1fr); column-gap: 6vw; align-items: center; }
     :root[data-immersive] .card.two-col .art-wrap { width: min(40vh, 400px); height: min(40vh, 400px); }
     :root[data-immersive] .card.two-col .lyrics.show { height: min(58vh, 620px); }
+  }
+  /* ---- 移动端(≤600px)布局收紧:更小内边距/间距 + 响应式封面,让首屏尽量容下封面+信息+歌词开头 ---- */
+  @media (max-width: 600px) {
+    body { padding: max(12px, env(safe-area-inset-top)) 10px max(14px, env(safe-area-inset-bottom)); }
+    .card { padding: 22px 16px 20px; border-radius: 22px; }
+    .art-wrap { width: min(210px, 58vw); height: min(210px, 58vw); margin: 0 auto 16px; }
+    .status { margin-bottom: 12px; }
+    h1 { font-size: 20px; }
+    .artist { font-size: 15px; }
+    .progress { margin-top: 16px; }
+    .links { margin-top: 16px; gap: 12px; }
+    .lyrics { margin-top: 14px; }
+    .lyrics.show { height: 160px; }
+    .history-wrap { margin-top: 16px; padding-top: 14px; }
+    .history { max-height: 220px; }
+    .meta { margin-top: 16px; }
   }
   .hidden { display: none !important; }
 </style>
@@ -968,9 +980,9 @@
   (function initTheme() {
     const btn = el('theme-toggle');
     if (!btn) return;
-    const THEMES = ['auto', 'oled', 'light'];
-    const ICON = { auto: '🌗', oled: '🌑', light: '☀️' };
-    const LABEL = { auto: '氛围', oled: '纯黑', light: '浅色' };
+    const THEMES = ['auto', 'light'];
+    const ICON = { auto: '🌗', light: '☀️' };
+    const LABEL = { auto: '氛围', light: '浅色' };
     const apply = t => {
       const root = document.documentElement;
       if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
