@@ -257,7 +257,8 @@
   .history a:hover { background: rgba(255,255,255,.06); }
   .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-artist { flex-shrink: 0; max-width: 42%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-dev { flex-shrink: 0; font-size: 11px; opacity: .5; line-height: 1; }
+  .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent, #8a919e); }
+  .history .h-dev svg { width: 14px; height: 14px; display: block; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -645,6 +646,11 @@
     stat.textContent = `今日 · ${count} 首 · ${approx}${dur}`;
   }
   let historySig = ''; // 上次渲染的历史列表签名;内容没变就跳过重建
+  // 历史行设备图标(单色线描,走 currentColor→--accent 跟随专辑主色):笔记本=Mac / 手机=iPhone。
+  const DEV_ICON = {
+    mac: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="11.5" rx="1.6"/><path d="M1.5 20h21"/></svg>',
+    iphone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2" width="11" height="20" rx="2.6"/><path d="M10.5 18.4h3"/></svg>',
+  };
   function renderHistory(items) {
     const box = el('history'), wrap = el('history-wrap');
     if (!items.length) { wrap.classList.add('hidden'); historySig = ''; updateLayout(); return; }
@@ -658,8 +664,12 @@
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
-      const dev = it.device === 'iphone' ? '📱' : it.device === 'mac' ? '💻' : '';
-      if (dev) { const d = document.createElement('span'); d.className = 'h-dev'; d.textContent = dev; d.title = it.device === 'iphone' ? 'iPhone' : 'Mac'; a.appendChild(d); }
+      if (it.device === 'iphone' || it.device === 'mac') {
+        const d = document.createElement('span'); d.className = 'h-dev';
+        d.innerHTML = DEV_ICON[it.device]; // 静态可信 SVG,非用户输入
+        d.title = it.device === 'iphone' ? 'iPhone' : 'Mac';
+        a.appendChild(d);
+      }
       const t = document.createElement('span'); t.className = 'h-title'; t.textContent = it.title;
       const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
       a.appendChild(t); a.appendChild(ar); box.appendChild(a);
