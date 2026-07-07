@@ -242,6 +242,12 @@
   .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
   .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; }
+  /* 历史列表里"今天"和"更早"之间的分界线:靠左小标签 + 向右延伸的细线。 */
+  .h-divider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    color: #6b7280; opacity: .8; user-select: none; }
+  .h-divider::after { content: ''; flex: 1; height: 1px; background: currentColor; opacity: .3; }
+  .h-divider:first-child { margin-top: 0; }
   .today-stat { font-size: 11px; font-weight: 600; color: var(--accent, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history {
     display: flex; flex-direction: column; gap: 1px;
@@ -285,6 +291,7 @@
   :root[data-theme="light"] .meta,
   :root[data-theme="light"] .meta a,
   :root[data-theme="light"] .history-title,
+  :root[data-theme="light"] .h-divider,
   :root[data-theme="light"] .lrc-roma,
   :root[data-theme="light"] .lrc-tr { color: #7a828f; }
   :root[data-theme="light"] .status { background: rgba(0,0,0,.06); color: #5a616e; }
@@ -661,7 +668,20 @@
     const prevTop = box.scrollTop; // 确需重建时先记住滚动位置,建完还原
     historySig = sig;
     box.textContent = '';
+    // 今天/更早分界线:与 renderTodayStat 用同一本地零点口径。items 已按时间倒序,只在
+    // "先出现过今天的记录、之后才出现更早的记录"时插入一次——纯粹全是今天或全是更早
+    // 都不需要分界线(没有今天可对比,分界线毫无意义,徒增噪音)。
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const todayCutoff = Math.floor(midnight.getTime() / 1000);
+    let sawToday = false, dividerShown = false;
     for (const it of items) {
+      const isToday = (it.listenedAt || 0) >= todayCutoff;
+      if (isToday) sawToday = true;
+      if (!dividerShown && sawToday && !isToday) {
+        dividerShown = true;
+        const div = document.createElement('div'); div.className = 'h-divider'; div.textContent = '更早';
+        box.appendChild(div);
+      }
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
