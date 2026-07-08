@@ -297,6 +297,8 @@
   .history .h-artist { flex-shrink: 0; max-width: 42%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent, #8a919e); }
   .history .h-dev svg { width: 14px; height: 14px; display: block; }
+  /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
+  .history .h-count { flex-shrink: 0; min-width: 18px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent, #8a919e); font-variant-numeric: tabular-nums; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -641,6 +643,7 @@
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
           renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 })));
           renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
+          getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
         }
       } catch (e) { /* 中继不通 → LB 兜底 */ }
@@ -654,6 +657,7 @@
       }));
       const today = await collectTodayListens(listens);
       renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
+      getMonthCounts().then(applyMonthCounts).catch(() => {});
     } catch (e) {}
   }
   // 收集「今天」的全部 listen 用于统计。LB 单次最多 100 条，超过就用 max_ts 往前翻页，
@@ -674,6 +678,52 @@
     }
     return acc;
   }
+  // 近30天每首歌播放次数:中继 /history 最多给 200 条(覆盖不了 30 天),这里独立于历史
+  // 列表本身直接翻页 LB 拿全近30天数据统计——请求链路较慢(最多翻 15 页),缓存 15 分钟,
+  // 不跟着历史列表每 30s 的刷新一起重算(那样会一直在拉全量近30天数据,浪费且慢)。
+  let monthCounts = null, monthCountsAt = 0;
+  const MONTH_COUNTS_TTL = 15 * 60 * 1000;
+  async function getMonthCounts() {
+    const now = Date.now();
+    if (monthCounts && now - monthCountsAt < MONTH_COUNTS_TTL) return monthCounts;
+    if (USER === 'CHANGE_ME') return new Map();
+    const cutoff = Math.floor((now - 30 * 86400000) / 1000);
+    const counts = new Map();
+    let maxTs = null;
+    for (let i = 0; i < 15; i++) {
+      const url = maxTs
+        ? `${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100&max_ts=${maxTs}`
+        : `${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`;
+      let page;
+      try {
+        const re = await fetchJSON(url, 12000);
+        page = (re.payload && re.payload.listens) || [];
+      } catch (e) { break; } // 翻页中途失败:用已拿到的部分统计,好过完全没有
+      if (!page.length) break;
+      let hitCutoff = false;
+      for (const l of page) {
+        if ((l.listened_at || 0) < cutoff) { hitCutoff = true; continue; }
+        const m = l.track_metadata;
+        if (!m || !m.track_name) continue;
+        const key = `${m.artist_name || ''}|${m.track_name}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      maxTs = page[page.length - 1].listened_at || 0;
+      if (hitCutoff || page.length < 100) break; // 已跨过 30 天前 / 没有更早的了
+    }
+    monthCounts = counts;
+    monthCountsAt = now;
+    return counts;
+  }
+  // 把统计结果贴回已渲染的历史行(按 data-key 找,不用重建 DOM/不打断滚动)。
+  function applyMonthCounts(counts) {
+    document.querySelectorAll('#history .h-count').forEach(el => {
+      const c = counts.get(el.dataset.key) || 0;
+      el.textContent = c >= 2 ? `×${c}` : '';
+      el.title = c >= 2 ? `近30天播放 ${c} 次` : '';
+    });
+  }
+
   // 今日收听统计:输入归一化条目 [{listenedAt(秒), durationMs}]。按本地当天 0 点过滤。
   // 时长优先用各条 durationMs;iPhone 经 Last.fm 桥接的没有时长,用当天已知时长的均值补估、
   // 并标"约",不假装精确。
@@ -738,11 +788,13 @@
       }
       const t = document.createElement('span'); t.className = 'h-title'; t.textContent = it.title;
       const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
-      a.appendChild(t); a.appendChild(ar); box.appendChild(a);
+      const cnt = document.createElement('span'); cnt.className = 'h-count'; cnt.dataset.key = `${it.artist}|${it.title}`;
+      a.appendChild(t); a.appendChild(ar); a.appendChild(cnt); box.appendChild(a);
     }
     box.scrollTop = prevTop;
     wrap.classList.remove('hidden');
     updateLayout();
+    if (monthCounts) applyMonthCounts(monthCounts); // 缓存已就绪(比如切标签页回来重渲染):立刻贴回,不用等下一轮 fetchHistory
   }
 
   // connecting=true(重连中,还没确认到底有没有数据)用动画+琥珀色圆点;false(已确认为空/
