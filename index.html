@@ -273,6 +273,9 @@
   .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
   .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; }
+  /* "近30天播放"列名:右对齐,跟每行 .h-count 徽章对齐,说明那个数字列是什么意思。 */
+  .history-cols { display: flex; justify-content: flex-end; padding: 0 8px 4px; }
+  .history-cols span { font-size: 10px; color: #6b7280; letter-spacing: .2px; opacity: .8; }
   /* 历史列表里"今天"和"更早"之间的分界线:靠左小标签 + 向右延伸的细线。 */
   .h-divider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 4px;
     font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
@@ -324,6 +327,7 @@
   :root[data-theme="light"] .meta,
   :root[data-theme="light"] .meta a,
   :root[data-theme="light"] .history-title,
+  :root[data-theme="light"] .history-cols span,
   :root[data-theme="light"] .h-divider,
   :root[data-theme="light"] .lrc-roma,
   :root[data-theme="light"] .lrc-tr { color: #7a828f; }
@@ -434,6 +438,7 @@
       <span class="history-title">最近播放</span>
       <span id="today-stat" class="today-stat"></span>
     </div>
+    <div class="history-cols"><span>近30天播放</span></div>
     <div id="history" class="history"></div>
   </div>
   </div><!-- /.side -->
