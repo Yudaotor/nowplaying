@@ -189,6 +189,7 @@
   h1 {
     font-size: 22px; font-weight: 700; line-height: 1.35; margin-bottom: 8px;
     overflow-wrap: anywhere;
+    min-height: calc(22px * 1.35 * 2); /* 预留两行高度,缓存标题与实时标题行数不同时不再挤动下方内容 */
   }
   .artist { font-size: 16px; color: #c8cdd6; margin-bottom: 4px; overflow-wrap: anywhere; }
   .album { font-size: 13px; color: #8a91a0; overflow-wrap: anywhere; }
@@ -532,6 +533,11 @@
   const LAST_KEY = 'np:last';
   function persist(s) { try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch (e) {} }
   function loadPersisted() { try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { return null; } }
+  // 最近一次渲染的历史列表(裁到 40 条):首屏秒渲染用,让 history-wrap/两栏版式在
+  // fetchHistory() 落地前就已经是最终形状,而不是从隐藏态弹出再把卡片撑宽。
+  const HIST_LAST_KEY = 'np:lastHistory';
+  function persistHistory(items) { try { localStorage.setItem(HIST_LAST_KEY, JSON.stringify(items.slice(0, 40))); } catch (e) {} }
+  function loadPersistedHistory() { try { return JSON.parse(localStorage.getItem(HIST_LAST_KEY) || 'null'); } catch (e) { return null; } }
   // 最后一次「看到正在播放」的曲目(带 seenAt)。停播后 LB 只保留满 scrobble 阈值的
   // listen，短播/被我重启清零的曲目不在其中，会让显示回退到更旧的歌。用它兜住：空闲时
   // 若这条比 LB 最新 listen 更近，就继续显示它当「上次播放」。
@@ -582,7 +588,13 @@
     // 播放没有进度数据，歌词无法滚动、只会僵在首行，此时干脆不显示。
     const syncable = !!s.playing && s.durationMs > 0 && typeof s.progressTs === 'number';
     setLyrics(s, syncable, sameTrack);
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '' });
+    // 一并缓存进度/歌词原文用的字段,好让下次开页时进度条和歌词面板也能跟着秒渲染
+    // 出最终形状(而不是只有标题/封面提前铺好,进度条和歌词仍要等 tick() 落地才弹出)。
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '',
+      lyrics: s.lyrics || '', lyricsTr: s.lyricsTr || '', lyricsRoma: s.lyricsRoma || '', lyricsYRC: s.lyricsYRC || '',
+      durationMs: s.durationMs || 0, progressMs: s.progressMs || 0, progressTs: (typeof s.progressTs === 'number' ? s.progressTs : null),
+      rate: (s.rate == null ? null : s.rate), ageMs: (typeof s.ageMs === 'number' ? s.ageMs : null), fetchedAt: (typeof s.fetchedAt === 'number' ? s.fetchedAt : null),
+      relayFresh: !!s.relayFresh });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
 
@@ -633,6 +645,7 @@
     if (!document.querySelector('.card').classList.contains('stale')) return;
     const p = loadPersisted();
     if (p && p.title) await paint({ ...p, playing: false });
+    setProgress(null); // 退回"上次播放"语义,不是当下真实进度,别继续顶着一条不会走的进度条
     document.querySelector('.card').classList.remove('stale');
   }
 
@@ -656,7 +669,9 @@
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
-          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 })));
+          const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 }));
+          persistHistory(items);
+          renderHistory(items);
           renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
           getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
@@ -666,10 +681,12 @@
     try {
       const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, 12000);
       const listens = (re.payload && re.payload.listens) || [];
-      renderHistory(listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
+      const items = listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
         const m = l.track_metadata, ai = m.additional_info || {};
         return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
-      }));
+      });
+      persistHistory(items);
+      renderHistory(items);
       const today = await collectTodayListens(listens);
       renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
       getMonthCounts().then(applyMonthCounts).catch(() => {});
@@ -1262,10 +1279,14 @@
     });
   })();
 
-  // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。
+  // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。历史列表也一并用缓存先铺出来
+  // (决定两栏版式的 updateLayout() 就看历史区是否隐藏),这样进度条/歌词/历史/两栏宽卡
+  // 都在第一帧就是最终形状,tick()/fetchHistory() 落地后只是刷新内容,不再整体改版式。
   const persisted = loadPersisted();
+  const persistedHistory = loadPersistedHistory();
+  if (persistedHistory && persistedHistory.length) renderHistory(persistedHistory);
   if (persisted && persisted.title) {
-    everRendered = true; paint(persisted); setStale(true);
+    everRendered = true; paint(persisted); setProgress(persisted); setStale(true);
     // 兜底:LB 若全程卡住(所有拉取都超时),“更新中…”最多挂 10 秒就回落到缓存正常态,
     // 别让用户干等——后台每 6s 仍在悄悄重试,恢复了自动换实时。
     setTimeout(revertStale, 10000);
