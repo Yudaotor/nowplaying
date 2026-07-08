@@ -274,8 +274,13 @@
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
   .history-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; }
   /* "近30天播放"列名:右对齐,跟每行 .h-count 徽章对齐,说明那个数字列是什么意思。 */
-  .history-cols { display: flex; justify-content: flex-end; padding: 0 8px 4px; }
+  /* 列名跟下面每行的 .h-dev/.h-title/.h-artist/.h-count 一一对齐:占位宽度用同一套数字。 */
+  .history-cols { display: flex; align-items: baseline; gap: 10px; padding: 0 8px 4px; }
   .history-cols span { font-size: 10px; color: #6b7280; letter-spacing: .2px; opacity: .8; }
+  .history-cols .hc-dev { flex-shrink: 0; width: 14px; }
+  .history-cols .hc-title { flex: 1; min-width: 0; }
+  .history-cols .hc-artist { flex-shrink: 0; width: 34%; }
+  .history-cols .hc-count { flex-shrink: 0; width: 40px; text-align: right; }
   /* 历史列表里"今天"和"更早"之间的分界线:靠左小标签 + 向右延伸的细线。 */
   .h-divider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 4px;
     font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
@@ -297,11 +302,11 @@
   }
   .history a:hover { background: rgba(255,255,255,.06); }
   .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-artist { flex-shrink: 0; max-width: 42%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-artist { flex-shrink: 0; max-width: 34%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent, #8a919e); }
   .history .h-dev svg { width: 14px; height: 14px; display: block; }
   /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
-  .history .h-count { flex-shrink: 0; min-width: 18px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent, #8a919e); font-variant-numeric: tabular-nums; }
+  .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent, #8a919e); font-variant-numeric: tabular-nums; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -438,7 +443,12 @@
       <span class="history-title">最近播放</span>
       <span id="today-stat" class="today-stat"></span>
     </div>
-    <div class="history-cols"><span>近30天播放</span></div>
+    <div class="history-cols">
+      <span class="hc-dev"></span>
+      <span class="hc-title">歌名</span>
+      <span class="hc-artist">歌手</span>
+      <span class="hc-count">30天</span>
+    </div>
     <div id="history" class="history"></div>
   </div>
   </div><!-- /.side -->
@@ -799,7 +809,18 @@
     box.scrollTop = prevTop;
     wrap.classList.remove('hidden');
     updateLayout();
+    alignHistoryCols();
     if (monthCounts) applyMonthCounts(monthCounts); // 缓存已就绪(比如切标签页回来重渲染):立刻贴回,不用等下一轮 fetchHistory
+  }
+  // 列名行在 #history 的滚动容器外面,不受滚动条挤占宽度影响,数据行在容器里面会被
+  // 滚动条吃掉一点可用宽度——两者右边界因此对不齐。滚动条宽度因系统/浏览器而异
+  // (macOS 悬浮滚动条通常是0,其它环境可能有实际宽度),写死一个补偿值在不同设备上
+  // 反而可能对不齐,这里运行时实测再补偿到列名行的右内边距上。
+  function alignHistoryCols() {
+    const box = el('history'), cols = document.querySelector('.history-cols');
+    if (!box || !cols) return;
+    const sbw = box.offsetWidth - box.clientWidth;
+    cols.style.paddingRight = (8 + sbw) + 'px';
   }
 
   // connecting=true(重连中,还没确认到底有没有数据)用动画+琥珀色圆点;false(已确认为空/
