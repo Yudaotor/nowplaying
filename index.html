@@ -42,24 +42,29 @@
     transition: background-image .8s ease;
     z-index: 0;
   }
-  /* 廉价"流动渐变":三团由封面主色派生的柔光色斑，在模糊封面之上缓慢漂移，营造流动彩雾
-     (纯 CSS、不读封面像素、几乎不耗电；--c1/c2/c3 由 setAccent 从 accent 派生)。 */
-  #flow {
-    position: fixed; inset: -25%; z-index: 0; pointer-events: none; opacity: .5;
+  /* 廉价"流动渐变":三团柔光色斑，在模糊封面之上缓慢漂移，营造流动彩雾(纯 CSS、不读
+     封面像素、几乎不耗电)。叠两层(.flow-a/.flow-b)交替担任"当前显示"：换歌时新主色画到
+     当前不可见的那层再淡入，旧层淡出——多层径向渐变本身不能被 transition 平滑插值(不像
+     纯色)，两层交叉淡入淡出才能避免色斑瞬间跳变。--fc1/2/3 是各层自己的局部变量，由
+     setAccent 分别设置，互不影响。 */
+  .flow {
+    position: fixed; inset: -25%; z-index: 0; pointer-events: none; opacity: 0;
     background:
-      radial-gradient(42% 42% at 28% 30%, var(--c1, #6a4bd0), transparent 70%),
-      radial-gradient(46% 46% at 72% 38%, var(--c2, #c0507a), transparent 70%),
-      radial-gradient(52% 52% at 50% 76%, var(--c3, #3f8fd0), transparent 72%);
+      radial-gradient(42% 42% at 28% 30%, var(--fc1, #6a4bd0), transparent 70%),
+      radial-gradient(46% 46% at 72% 38%, var(--fc2, #c0507a), transparent 70%),
+      radial-gradient(52% 52% at 50% 76%, var(--fc3, #3f8fd0), transparent 72%);
     filter: blur(64px) saturate(1.25);
     animation: flow 34s ease-in-out infinite alternate;
-    will-change: transform;
+    will-change: transform, opacity;
+    transition: opacity .6s ease;
   }
+  .flow.on { opacity: .5; }
   @keyframes flow {
     0%   { transform: translate(-4%, -3%) rotate(0deg) scale(1.06); }
     50%  { transform: translate(3%, 4%) rotate(9deg) scale(1.16); }
     100% { transform: translate(-2%, 3%) rotate(-6deg) scale(1.09); }
   }
-  @media (prefers-reduced-motion: reduce) { #flow { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
   .card {
     position: relative; z-index: 1;
     width: min(92vw, 400px);
@@ -127,9 +132,9 @@
     position: absolute; left: 17%; top: 17%; width: 66%; height: 66%;
     border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.55); z-index: 2;
   }
-  .art-wrap.vinyl .art.playing { animation: vinylspin 18s linear infinite; } /* 慢速 */
-  @keyframes vinylspin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .art.playing { animation: none; } }
+  /* 转速由 JS(Web Animations API)接管,见 initVinylSpin——暂停/恢复要衔接"当前转到哪个
+     角度了",纯 CSS keyframe 重启会看起来跳变;这里显式关掉 CSS 版避免叠加。 */
+  .art-wrap.vinyl .art.playing { animation: none; }
   /* 中央轴孔(静止,盖在标签中心)。 */
   .art-wrap.vinyl .spindle {
     display: block; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px;
@@ -174,6 +179,13 @@
   .eq span:nth-child(2) { height: 100%; animation-delay: -.2s; }
   .eq span:nth-child(3) { height: 45%; animation-delay: 0s; }
   @keyframes eq { 0%,100% { transform: scaleY(.4);} 50% { transform: scaleY(1);} }
+  /* 空闲态呼吸圆点:统一"重连中/确认为空"两个空态共用的视觉语言——重连中动画+琥珀色,
+     确认为空(没有数据/没配置)静态+中性灰,用同一个组件表达两种不同的确定性程度。 */
+  .idle-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: #6b7280; flex-shrink: 0; }
+  .status.idle .idle-dot { display: inline-block; }
+  .status.idle.connecting .idle-dot { background: #e8a33d; animation: breathe-dot 1.6s ease-in-out infinite; }
+  @keyframes breathe-dot { 0%, 100% { opacity: .45; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.2); } }
+  @media (prefers-reduced-motion: reduce) { .status.idle.connecting .idle-dot { animation: none; opacity: .85; } }
   h1 {
     font-size: 22px; font-weight: 700; line-height: 1.35; margin-bottom: 8px;
     overflow-wrap: anywhere;
@@ -182,11 +194,26 @@
   .album { font-size: 13px; color: #8a91a0; overflow-wrap: anywhere; }
   .progress { width: 100%; margin-top: 22px; display: none; }
   .progress.show { display: block; }
-  .bar { position: relative; height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
+  .bar { position: relative; height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); }
   .bar-fill {
     position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
     border-radius: 999px; background: var(--accent, #f5f6f8);
     transition: background .8s ease;
+  }
+  /* 播放头呼吸光晕:骑在 bar-fill 右边缘(即当前播放位置),播放时呼吸,暂停立即收起——
+     一眼就能看出是否在播放。是 bar-fill 的伪元素,天然跟着 width% 走,不用额外 JS 定位。 */
+  .bar-fill::after {
+    content: ''; position: absolute; right: -1px; top: 50%; width: 9px; height: 9px;
+    border-radius: 50%; background: var(--accent, #f5f6f8); transform: translate(50%, -50%);
+    opacity: 0; transition: opacity .25s ease;
+  }
+  .progress.is-live .bar-fill::after { opacity: 1; animation: bar-head-glow 1.8s ease-in-out infinite; }
+  @keyframes bar-head-glow {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #f5f6f8) 45%, transparent); }
+    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .progress.is-live .bar-fill::after { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #f5f6f8) 30%, transparent); }
   }
   .times {
     display: flex; justify-content: space-between; margin-top: 8px;
@@ -203,8 +230,12 @@
   /* 上下留白 ≈ 半个视口，好让首行/末行也能滚到正中央(自动跟随与手动滑动共用)。 */
   .lyrics-inner { padding: 150px 0; }
   /* 每个歌词行可含三小行：罗马音(上)/原文(中)/翻译(下)。原文可逐字(yrc)或整行高亮。 */
-  .lrc-line { padding: 6px 0; transition: opacity .3s ease; opacity: .5; overflow-wrap: anywhere; }
-  .lrc-line.active { opacity: 1; }
+  /* 卡拉OK式景深:当前行放大+满不透明度做视觉焦点,相邻±1行次之,更远的行更淡——
+     配合 .lyrics 已有的顶部/底部渐隐遮罩,读起来像"聚焦在当前句"而不是一排等权重的字。 */
+  .lrc-line { padding: 6px 0; transition: opacity .3s ease, transform .3s ease; opacity: .35; overflow-wrap: anywhere; }
+  .lrc-line.lrc-near { opacity: .6; }
+  .lrc-line.active { opacity: 1; transform: scale(1.04); transform-origin: center; }
+  @media (prefers-reduced-motion: reduce) { .lrc-line.active { transform: none; } }
   .lrc-roma { font-size: 11px; line-height: 1.25; color: #838a97; margin-bottom: 1px; }
   .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
   .lrc-line.active .lrc-main { color: var(--accent, #f2f4f7); } /* 行级高亮(无逐字时) */
@@ -282,7 +313,7 @@
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
   :root[data-theme="light"] #bg { filter: blur(60px) saturate(1.5) brightness(1.02); opacity: .4; }
-  :root[data-theme="light"] #flow { opacity: .3; }
+  :root[data-theme="light"] .flow.on { opacity: .3; }
   :root[data-theme="light"] .card { background: rgba(255,255,255,.74); border-color: rgba(0,0,0,.08); box-shadow: 0 24px 80px rgba(0,0,0,.22); }
   :root[data-theme="light"] h1 { color: #1c1f26; }
   :root[data-theme="light"] .artist { color: #3a404b; }
@@ -349,7 +380,8 @@
 </head>
 <body>
 <div id="bg"></div>
-<div id="flow"></div>
+<div id="flow-a" class="flow on"></div>
+<div id="flow-b" class="flow"></div>
 <main class="card">
   <div class="tools">
     <button id="theme-toggle" class="tool-btn" title="主题：氛围 / 纯黑 / 浅色（点击切换）" aria-label="切换主题">🌗</button>
@@ -366,6 +398,7 @@
   </div>
   <div id="status" class="status">
     <span class="eq"><span></span><span></span><span></span></span>
+    <span id="idle-dot" class="idle-dot"></span>
     <span id="status-text">加载中…</span>
     <span id="device-icon" class="device-icon"></span>
   </div>
@@ -496,9 +529,12 @@
     // rate=0 → 当前曲目但暂停；rate>0/未知 → 播放中。
     const live = !!s.playing && s.rate !== 0;
     const paused = !!s.playing && s.rate === 0;
+    el('status').classList.remove('idle', 'connecting');
     el('status').classList.toggle('live', live);
     el('art').classList.toggle('playing', live);
     el('art-wrap').classList.toggle('playing', live); // 黑胶唱臂落下/抬起
+    if (window.setVinylPlaying) window.setVinylPlaying(live); // 黑胶转速缓动(WAAPI)
+    el('progress').classList.toggle('is-live', live); // 播放头呼吸光晕只在真正播放时出现
     el('status-text').textContent = live ? '正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
@@ -545,18 +581,27 @@
     }
     return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
   }
+  // flow-a/flow-b 交替担任"当前显示"的色斑层;flowOn 记录哪一层现在亮着(0=a,1=b)。
+  // 同一个 hex 重复调用(同曲每次 poll 都会来一次)不重新触发交叉淡入淡出。
+  let flowOn = 0, lastAccentHex = '';
   function setAccent(hex) {
     const root = document.documentElement;
     if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) {
       root.style.setProperty('--accent', hex);
+      if (hex === lastAccentHex) return;
+      lastAccentHex = hex;
       const [h, s, l] = hexToHsl(hex);
       const S = Math.min(85, Math.max(48, s)), L = Math.min(62, Math.max(46, l));
-      root.style.setProperty('--c1', `hsl(${h} ${S}% ${L}%)`);
-      root.style.setProperty('--c2', `hsl(${(h + 38) % 360} ${S}% ${L}%)`);
-      root.style.setProperty('--c3', `hsl(${(h + 322) % 360} ${S}% ${L}%)`);
+      const c1 = `hsl(${h} ${S}% ${L}%)`, c2 = `hsl(${(h + 38) % 360} ${S}% ${L}%)`, c3 = `hsl(${(h + 322) % 360} ${S}% ${L}%)`;
+      const next = el(flowOn ? 'flow-a' : 'flow-b'), prev = el(flowOn ? 'flow-b' : 'flow-a');
+      next.style.setProperty('--fc1', c1); next.style.setProperty('--fc2', c2); next.style.setProperty('--fc3', c3);
+      next.classList.add('on');
+      prev.classList.remove('on');
+      flowOn = flowOn ? 0 : 1;
     } else {
+      lastAccentHex = '';
       root.style.removeProperty('--accent');
-      root.style.removeProperty('--c1'); root.style.removeProperty('--c2'); root.style.removeProperty('--c3');
+      el('flow-a').classList.remove('on'); el('flow-b').classList.remove('on');
     }
   }
 
@@ -700,10 +745,16 @@
     updateLayout();
   }
 
-  function paintIdle(msg) {
+  // connecting=true(重连中,还没确认到底有没有数据)用动画+琥珀色圆点;false(已确认为空/
+  // 未配置)用静态+中性灰——同一个 idle-dot 组件表达两种不同的确定性程度。
+  function paintIdle(msg, connecting) {
     el('status').classList.remove('live');
+    el('status').classList.add('idle');
+    el('status').classList.toggle('connecting', !!connecting);
     el('art').classList.remove('playing');
     el('art-wrap').classList.remove('playing');
+    if (window.setVinylPlaying) window.setVinylPlaying(false);
+    el('progress').classList.remove('is-live');
     el('status-text').textContent = '暂无播放';
     el('device-icon').textContent = '';
     el('title').textContent = '这会儿很安静';
@@ -822,9 +873,17 @@
     let idx = -1;
     for (let i = 0; i < lrcLines.length && lrcLines[i].t <= posMs; i++) idx = i;
     if (idx !== lrcActive) {
-      if (lrcActive >= 0) lrcLines[lrcActive].el.classList.remove('active');
+      // 卡拉OK式景深:只需清旧 active±1(near)范围、再给新 active±1 打标记,不用扫全表。
+      for (let d = -1; d <= 1; d++) {
+        const l = lrcLines[lrcActive + d];
+        if (l) l.el.classList.remove('active', 'lrc-near');
+      }
       lrcActive = idx;
-      if (idx >= 0) lrcLines[idx].el.classList.add('active');
+      if (idx >= 0) {
+        lrcLines[idx].el.classList.add('active');
+        if (lrcLines[idx - 1]) lrcLines[idx - 1].el.classList.add('lrc-near');
+        if (lrcLines[idx + 1]) lrcLines[idx + 1].el.classList.add('lrc-near');
+      }
       if (!lrcUserScrolling) lrcScrollActive(true); // 手动滑动期间不抢滚动,停手后再回中
     }
     // 逐字渐变填色(只处理当前行):每个词按 (posMs-词始)/词长 算填充比例 0~100%,
@@ -981,7 +1040,7 @@
     if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('还没有任何收听记录'); else await revertStale(); return; }
     // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏；
     // 但首屏的“更新中…”不能一直挂着，把缓存那首按上次播放正常显示（后台继续重试）。
-    if (!everRendered) paintIdle('连接中…稍后自动重试'); else await revertStale();
+    if (!everRendered) paintIdle('连接中…稍后自动重试', true); else await revertStale();
   }
 
   // 试听按钮:点击切播放/暂停(首次点击才真正加载音频,满足自动播放手势要求)。
@@ -1000,10 +1059,80 @@
     a.addEventListener('ended', () => { btn.textContent = '▶'; btn.classList.remove('playing'); });
   })();
 
+  // 黑胶转速缓动:播放/暂停切换不再瞬间起停,而是先跑一小段加速/减速关键帧再衔接稳态
+  // 匀速循环,模拟真实唱机马达的物理直觉。用 Web Animations API(而非纯 CSS keyframe)是
+  // 因为暂停/恢复要衔接"当前转到哪个角度了",纯 CSS 动画重启会看起来跳变。只在黑胶模式
+  // 下生效(方形模式沿用 .art.playing 的呼吸缩放，见 CSS)。
+  (function initVinylSpin() {
+    const art = el('art'), wrap = el('art-wrap');
+    if (!art || !wrap) return;
+    const STEADY_MS = 18000; // 跟旧版 vinylspin 一致的稳态转速
+    const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let steady = null, transition = null, wantSpin = false;
+    // 状态机让重复调用天然幂等:up/steady 都算"正在朝着转起来走"，down/stopped 都算"正在
+    // 朝着停下来走"。之前每次调用都无条件 cancel 正在跑的过渡再重开一个新的,轮询期间
+    // "仍在播放"重复触发 setVinylPlaying(true) 会不断打断 spin-up、永远等不到 onfinish
+    // 交给稳态循环——黑胶实测卡死在原地不转。改成"已经在朝这个方向走就别管"即可修复。
+    let state = 'stopped'; // stopped | up | steady | down
+    const angleNow = () => steady ? ((steady.currentTime || 0) % STEADY_MS) / STEADY_MS * 360 : 0;
+    function ensureSteady() {
+      if (!steady) {
+        steady = art.animate(
+          [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
+          { duration: STEADY_MS, iterations: Infinity, easing: 'linear' }
+        );
+        steady.pause();
+      }
+      return steady;
+    }
+    function stopAll() {
+      if (transition) { transition.cancel(); transition = null; }
+      if (steady) { steady.cancel(); steady = null; }
+      art.style.transform = '';
+      state = 'stopped';
+    }
+    function apply() {
+      if (!wrap.classList.contains('vinyl') || reduceMotion()) { stopAll(); return; }
+      ensureSteady();
+      if (wantSpin) {
+        if (state === 'up' || state === 'steady') return; // 已经在转/正在加速,别打断重开
+        const from = angleNow();
+        if (transition) { transition.cancel(); transition = null; }
+        state = 'up';
+        transition = art.animate(
+          [{ transform: `rotate(${from}deg)` }, { transform: `rotate(${from + 360}deg)` }],
+          { duration: 1200, easing: 'cubic-bezier(.13,.79,.24,1)' }
+        );
+        transition.onfinish = () => {
+          transition = null;
+          steady.currentTime = (from / 360) * STEADY_MS;
+          steady.play();
+          state = 'steady';
+        };
+      } else {
+        if (state === 'down' || state === 'stopped') return; // 已经停着/正在减速,别打断重开
+        const from = angleNow();
+        if (steady.playState === 'running') steady.pause();
+        if (transition) { transition.cancel(); transition = null; }
+        state = 'down';
+        transition = art.animate(
+          [{ transform: `rotate(${from}deg)` }, { transform: `rotate(${from + 46}deg)` }],
+          { duration: 800, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards' }
+        );
+        transition.onfinish = () => { transition = null; state = 'stopped'; };
+      }
+    }
+    window.setVinylPlaying = on => { wantSpin = !!on; apply(); };
+    window.__vinylSpinRefresh = apply; // 黑胶/方形切换后重新评估
+  })();
+
   // 黑胶 / 方形 切换(记忆到 localStorage，右上角小圆钮)。
   (function initVinyl() {
     const wrap = el('art-wrap'), btn = el('vinyl-toggle');
-    const apply = on => { wrap.classList.toggle('vinyl', on); btn.classList.toggle('on', on); };
+    const apply = on => {
+      wrap.classList.toggle('vinyl', on); btn.classList.toggle('on', on);
+      if (window.__vinylSpinRefresh) window.__vinylSpinRefresh();
+    };
     apply(localStorage.getItem('np:vinyl') !== '0'); // 默认黑胶;仅当用户显式关过('0')才方形
     btn.addEventListener('click', () => {
       const on = !wrap.classList.contains('vinyl');
@@ -1062,7 +1191,7 @@
     // 兜底:LB 若全程卡住(所有拉取都超时),“更新中…”最多挂 10 秒就回落到缓存正常态,
     // 别让用户干等——后台每 6s 仍在悄悄重试,恢复了自动换实时。
     setTimeout(revertStale, 10000);
-  } else { paintIdle('连接中…'); }
+  } else { paintIdle('连接中…', true); }
 
   tick();
   // 历史(74KB)延后,先让实时 now-playing 那条小请求抢到连接、卡片更快出。
