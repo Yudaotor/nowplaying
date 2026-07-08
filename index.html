@@ -639,7 +639,7 @@
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
-          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '' })));
+          renderHistory(d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 })));
           renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
           return;
         }
@@ -650,7 +650,7 @@
       const listens = (re.payload && re.payload.listens) || [];
       renderHistory(listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
         const m = l.track_metadata, ai = m.additional_info || {};
-        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '' };
+        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
       }));
       const today = await collectTodayListens(listens);
       renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
