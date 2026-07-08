@@ -117,8 +117,8 @@
   .art.playing { animation: breathe 3.8s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) { .art.playing { animation: none; } }
   /* ---- 黑胶模式(开关切换,存 localStorage)：外圈黑色带纹路胶片(静止),中心小圆放封面
-     当唱片标签(播放时旋转),叠中央轴孔 + 唱臂 ---- */
-  .disc, .spindle, .tonearm { display: none; }
+     当唱片标签(播放时旋转),叠唱臂 ---- */
+  .disc, .tonearm { display: none; }
   /* 黑胶盘:黑色 + 细纹路凹槽,accent 光晕。中心留给封面标签。 */
   .art-wrap.vinyl .disc {
     display: block; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
@@ -135,13 +135,6 @@
   /* 转速由 JS(Web Animations API)接管,见 initVinylSpin——暂停/恢复要衔接"当前转到哪个
      角度了",纯 CSS keyframe 重启会看起来跳变;这里显式关掉 CSS 版避免叠加。 */
   .art-wrap.vinyl .art.playing { animation: none; }
-  /* 中央轴孔(静止,盖在标签中心)。 */
-  .art-wrap.vinyl .spindle {
-    display: block; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px;
-    transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; z-index: 3;
-    background: radial-gradient(circle, #d8dce2 0 36%, #12101c 42% 100%);
-    box-shadow: 0 0 0 2px rgba(0,0,0,.5);
-  }
   /* 唱臂:暂停时抬起(42°离盘)、播放时落到唱片外圈(8°)，平滑摆动。 */
   .art-wrap.vinyl .tonearm { display: block; position: absolute; top: 14px; right: 2px; width: 126px; height: 16px; transform-origin: right center; transform: rotate(42deg); transition: transform .6s ease; pointer-events: none; z-index: 3; }
   .art-wrap.vinyl.playing .tonearm { transform: rotate(8deg); }
@@ -404,7 +397,6 @@
   <div id="art-wrap" class="art-wrap">
     <div class="disc"></div>
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
-    <div class="spindle"></div>
     <div class="tonearm"><div class="pivot"></div><div class="bar"></div><div class="head"></div></div>
     <button id="preview-btn" class="preview-btn hidden" aria-label="试听 30 秒" title="试听 30 秒（iTunes 预览）">▶</button>
   </div>
