@@ -536,6 +536,7 @@
   function loadLive() { try { return JSON.parse(localStorage.getItem(LIVE_KEY) || 'null'); } catch (e) { return null; } }
 
   let curKey = '';
+  let lastAppliedArt = ''; // 当前实际显示在 #art 上的封面 URL,见 paint() 里换歌封面纠正逻辑
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
@@ -563,15 +564,24 @@
     const sameTrack = key === curKey;
     curKey = key;
     let art = s.artwork || '';
+    const imgEl = el('art');
     if (!sameTrack) {
       resetPreview();
       loadPreview(artist, title, key);
-      const imgEl = el('art');
       if (!art) { imgEl.style.opacity = .3; art = await artworkFor(artist, title); if (key !== curKey) return; }
+    }
+    // 换歌瞬间采集器的 enrich(网易云/QQ 解析)常常还没跑完,art 这时是空的,上面先用客户端
+    // iTunes 兜底占位——但 iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错封面
+    // (实测坐实:Smooth Criminal 就被兜底选中了合集版封面)。真封面几秒后从服务端 poll 回来时
+    // 必须能纠正过来,不能被"同一首歌不再更新图"的判断卡死——所以这里不看 sameTrack,只看
+    // "这轮拿到的封面跟当前实际显示的是不是同一张",不同就换,同一张就跳过(避免每次 poll 都
+    // 重新赋值 src 造成没必要的重新请求/闪烁)。
+    if (art !== lastAppliedArt) {
       if (art) { imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`; }
       else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
-      imgEl.style.opacity = 1;
+      lastAppliedArt = art;
     }
+    imgEl.style.opacity = 1;
     setLinks(s.links || {});
     setAccent(s.accent);
     // 歌词只在"有播放位置可驱动"时显示(与进度条同一判据)。iPhone 经 Last.fm 桥接的
