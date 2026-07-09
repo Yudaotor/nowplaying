@@ -681,6 +681,8 @@
     try {
       const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, 12000);
       const listens = (re.payload && re.payload.listens) || [];
+      // 跟 state-worker 的 lbHistory() 取值逻辑相近但形状不同:这里只留 renderHistory()
+      // 真正用得到的字段,是本地变量不是要对外暴露的 API 响应,没必要跟那边完全同形状。
       const items = listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
         const m = l.track_metadata, ai = m.additional_info || {};
         return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
@@ -1076,15 +1078,23 @@
     try {
       // 采集器把网易云封面(国内可加载)塞进了 additional_info.cover_url；优先用它，
       // 苹果 mzstatic 在国内已无 CDN 节点、加载不出。
+      // fromLB 把 ListenBrainz 原始 listen 归一化成 paint() 能直接吃的形状。
+      // ⚠️ state-worker/src/index.js 里的同名函数几乎逐字段相同(多一个 ok 字段、叫
+      // device 不叫 source——那边是 relay 自己的 API 响应契约,这边要直接喂给 paint(),
+      // 命名不同是特意的)。两处分别部署在 GitHub Pages 和 Cloudflare Workers,没有共用
+      // 构建步骤,做不到真的共享同一份源码——改这里的字段,务必去 state-worker 那边也
+      // 照样改一遍,否则两边会悄悄不一致。
       const fromLB = (l, playing, listenedAt) => {
         const m = l.track_metadata || {};
         const ai = m.additional_info || {};
         const num = v => (typeof v === 'number' ? v : null);
-        return { title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
+        return {
+          title: m.track_name, artist: m.artist_name, album: m.release_name, playing, listenedAt,
           artwork: ai.cover_url || '', accent: ai.accent_color || '', source: ai.source || '',
           lyrics: ai.lyrics || '', lyricsTr: ai.lyrics_tr || '', lyricsRoma: ai.lyrics_roma || '', lyricsYRC: ai.lyrics_yrc || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
-          durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate) };
+          durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate),
+        };
       };
       const pn = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`, 8000);
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
