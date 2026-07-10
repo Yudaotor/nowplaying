@@ -16,7 +16,10 @@ self.addEventListener('activate', (e) => e.waitUntil((async () => {
 })()));
 
 function isCover(url) {
-  return url.hostname.endsWith('.music.126.net') || url.hostname.endsWith('.music.127.net');
+  // 网易云封面走 p*.music.126/127.net;QQ 音乐封面(qq.go qqSongCoverAndSinger)走
+  // y.qq.com/music/photo_new/ ——此前漏收录,这部分冷门兜底封面反而没被缓存/预热。
+  return url.hostname.endsWith('.music.126.net') || url.hostname.endsWith('.music.127.net') ||
+    url.hostname.endsWith('y.qq.com');
 }
 
 async function trimCache(cache, max) {
