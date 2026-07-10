@@ -537,17 +537,6 @@
 
   let curKey = '';
   let lastAppliedArt = ''; // 当前实际显示在 #art 上的封面 URL,见 paint() 里换歌封面纠正逻辑
-  // 客户端 iTunes 兜底图(见 artworkFor)本身是苹果的图,国内直连网络加载不出;放着不管
-  // 会一直显示一张裂图直到换下一首歌。这里不是不给兜底(兜底在多数网络下能用、体验更好,
-  // 之前整个删掉过一次结果 Mac 端反而没封面了——见 durable memory 里那次反复),而是图真的
-  // 加载失败时静默清空,不留裂图,下一轮 poll 服务端解析出网易云封面(国内可达)时会自动纠正。
-  el('art').addEventListener('error', () => {
-    if (el('art').getAttribute('src') === lastAppliedArt) {
-      el('art').removeAttribute('src');
-      el('bg').style.backgroundImage = '';
-      lastAppliedArt = '';
-    }
-  });
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
@@ -579,14 +568,14 @@
     if (!sameTrack) {
       resetPreview();
       loadPreview(artist, title, key);
-      // 换歌瞬间采集器的 enrich(网易云/QQ 解析)常常还没跑完,art 这时是空的,先用客户端
-      // iTunes 兜底占位——但 iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错
-      // 封面(实测坐实:Smooth Criminal 就被兜底选中了合集版封面,下方"服务端纠正"逻辑管这个)。
       if (!art) { imgEl.style.opacity = .3; art = await artworkFor(artist, title); if (key !== curKey) return; }
     }
-    // 服务端 enrich 完成后带着封面回来时必须能纠正过来,不能被"同一首歌不再更新图"的判断
-    // 卡死——所以这里不看 sameTrack,只看"这轮拿到的封面跟当前实际显示的是不是同一张",
-    // 不同就换,同一张就跳过(避免每次 poll 都重新赋值 src 造成没必要的重新请求/闪烁)。
+    // 换歌瞬间采集器的 enrich(网易云/QQ 解析)常常还没跑完,art 这时是空的,上面先用客户端
+    // iTunes 兜底占位——但 iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错封面
+    // (实测坐实:Smooth Criminal 就被兜底选中了合集版封面)。真封面几秒后从服务端 poll 回来时
+    // 必须能纠正过来,不能被"同一首歌不再更新图"的判断卡死——所以这里不看 sameTrack,只看
+    // "这轮拿到的封面跟当前实际显示的是不是同一张",不同就换,同一张就跳过(避免每次 poll 都
+    // 重新赋值 src 造成没必要的重新请求/闪烁)。
     if (art !== lastAppliedArt) {
       if (art) { imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`; }
       else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
