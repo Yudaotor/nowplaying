@@ -548,9 +548,12 @@
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
-    // rate=0 → 当前曲目但暂停；rate>0/未知 → 播放中。
     const live = !!s.playing && s.rate !== 0;
-    const paused = !!s.playing && s.rate === 0;
+    // 已暂停:不在播放、但服务端标注这仍是 Mac/iPhone 此刻活跃的曲目(current===true,见
+    // relayState()/fetchState() 注释)——暂停时服务端发的是 playing:false,不是 playing:true
+    // 加 rate:0,所以不能靠 s.playing 判断"是否暂停",得看 current。current 不是 true 时说明
+    // 已经回退到纯历史 fallback(退出播放器后显示的"上次播放"),不该显示"已暂停"。
+    const paused = !live && s.current === true;
     el('status').classList.remove('idle', 'connecting');
     el('status').classList.toggle('live', live);
     el('art').classList.toggle('playing', live);
@@ -1085,6 +1088,10 @@
         const d = await fetchJSON(`${RELAY}/now`, 4000);
         if (d && d.ok && !d.empty && d.title) {
           return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt,
+            // current:服务端显式标注这是 Mac/iPhone 此刻活跃的曲目(哪怕暂停),不是纯历史
+            // fallback——paint() 据此判断"已暂停"(见那边注释);之前这里漏传,"已暂停"分支
+            // 因此一直进不去,暂停时只能落到通用的"最近播放"(实测坐实:2026-07-10)。
+            current: d.current,
             artwork: d.artwork || '', accent: d.accent || '', source: d.device || '',
             lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
