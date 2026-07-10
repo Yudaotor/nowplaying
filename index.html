@@ -537,6 +537,14 @@
 
   let curKey = '';
   let lastAppliedArt = ''; // 当前实际显示在 #art 上的封面 URL,见 paint() 里换歌封面纠正逻辑
+  // 已经为这个 key 尝试过客户端 iTunes 兜底(不管拿没拿到结果),不用重复请求——单独用
+  // 这个变量记账、不能看 sameTrack:首屏"先用本地缓存秒渲染一次、真实数据紧接着又渲染
+  // 同一首歌"这个时序下,第二次调用 sameTrack 已经是 true 了,如果兜底请求也挂在
+  // sameTrack 上,会导致缓存渲染那次刚请求到的兜底图,被紧接着的真实数据渲染(服务端仍
+  // 无封面)误判成"这首歌不用再管封面"而跳过更新,然后又被下面"服务端值跟当前显示值不
+  // 一样就同步"的逻辑当成"服务端确认没有"直接清空——图片等于先显示了一下又被自己清掉
+  // (实测坐实:2026-07-10)。
+  let fallbackTriedKey = '';
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
@@ -568,18 +576,30 @@
     if (!sameTrack) {
       resetPreview();
       loadPreview(artist, title, key);
-      if (!art) { imgEl.style.opacity = .3; art = await artworkFor(artist, title); if (key !== curKey) return; }
     }
-    // 换歌瞬间采集器的 enrich(网易云/QQ 解析)常常还没跑完,art 这时是空的,上面先用客户端
-    // iTunes 兜底占位——但 iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错封面
-    // (实测坐实:Smooth Criminal 就被兜底选中了合集版封面)。真封面几秒后从服务端 poll 回来时
-    // 必须能纠正过来,不能被"同一首歌不再更新图"的判断卡死——所以这里不看 sameTrack,只看
-    // "这轮拿到的封面跟当前实际显示的是不是同一张",不同就换,同一张就跳过(避免每次 poll 都
-    // 重新赋值 src 造成没必要的重新请求/闪烁)。
-    if (art !== lastAppliedArt) {
-      if (art) { imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`; }
-      else { imgEl.removeAttribute('src'); el('bg').style.backgroundImage = ''; }
-      lastAppliedArt = art;
+    // 换歌瞬间(或首屏缓存渲染那次)采集器的 enrich(网易云/QQ 解析)常常还没跑完,art 这时
+    // 是空的,用客户端 iTunes 兜底占位——按 fallbackTriedKey(不是 sameTrack)记账只试一次,
+    // 见上面变量声明处注释。
+    if (!art && fallbackTriedKey !== key) {
+      fallbackTriedKey = key;
+      imgEl.style.opacity = .3;
+      art = await artworkFor(artist, title);
+      if (key !== curKey) return;
+    }
+    // iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错封面(实测坐实:Smooth
+    // Criminal 就被兜底选中了合集版封面)。真封面几秒后从服务端 poll 回来时必须能纠正过来,
+    // 不能被"同一首歌不再更新图"的判断卡死——所以拿到非空封面时不看 sameTrack,只看"这轮
+    // 拿到的跟当前实际显示的是不是同一张"。但服务端汇报"这首歌没有封面"(art 为空)时,只有
+    // 真的换了新曲目才清空——同一首歌服务端还没解析出来,不该把已经在展示的图(不管是服务端
+    // 给的还是客户端兜底的)撤掉(实测坐实:2026-07-10,这条清空分支曾经把刚兜底成功的图冲掉)。
+    if (art) {
+      if (art !== lastAppliedArt) {
+        imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`;
+        lastAppliedArt = art;
+      }
+    } else if (!sameTrack) {
+      imgEl.removeAttribute('src'); el('bg').style.backgroundImage = '';
+      lastAppliedArt = '';
     }
     imgEl.style.opacity = 1;
     setLinks(s.links || {});
