@@ -159,6 +159,9 @@
   }
   .tool-btn:hover { background: rgba(255,255,255,.14); }
   .tool-btn.on { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
+  .tools-toggle { display: none; } /* 桌面端不用抽屉,见下方 max-width:600px 里的覆盖 */
+  .tools-toggle span { display: inline-block; transition: transform .2s ease; }
+  .tools-toggle.on span { transform: rotate(90deg); } /* "⋯" 转90°看起来像"⋮",暗示"已展开" */
   .status {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: 13px; font-weight: 600; letter-spacing: .4px;
@@ -388,6 +391,14 @@
     .history-wrap { margin-top: 16px; padding-top: 14px; }
     .history { max-height: 220px; }
     .meta { margin-top: 16px; }
+    /* 工具钮抽屉:小屏幕横排三个圆钮会跟黑胶模式下悬在封面右上方的唱臂图形打架
+       (实测坐实:2026-07-11)。平时只露一个"⋯"入口,点开才竖着展开三个真正的按钮,
+       收起时视觉体积降到原来的三分之一,不再跟唱臂抢地方。桌面端(>600px)不受影响,
+       维持原来横排常显。 */
+    .tools-toggle { display: flex; }
+    .tools { flex-direction: column; align-items: flex-end; }
+    .tools #theme-toggle, .tools #vinyl-toggle, .tools #fs-toggle { display: none; }
+    .tools.open #theme-toggle, .tools.open #vinyl-toggle, .tools.open #fs-toggle { display: flex; }
   }
   .hidden { display: none !important; }
 </style>
@@ -397,7 +408,8 @@
 <div id="flow-a" class="flow on"></div>
 <div id="flow-b" class="flow"></div>
 <main class="card">
-  <div class="tools">
+  <div id="tools" class="tools">
+    <button id="tools-toggle" class="tool-btn tools-toggle" title="更多设置" aria-label="展开设置" aria-expanded="false"><span>⋯</span></button>
     <button id="theme-toggle" class="tool-btn" title="主题：氛围 / 纯黑 / 浅色（点击切换）" aria-label="切换主题">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" title="黑胶 / 方形 切换" aria-label="黑胶/方形切换">💿</button>
     <button id="fs-toggle" class="tool-btn" title="沉浸 / 全屏模式" aria-label="沉浸全屏模式">⛶</button>
@@ -1325,6 +1337,26 @@
     }
     window.setVinylPlaying = on => { wantSpin = !!on; apply(); };
     window.__vinylSpinRefresh = apply; // 黑胶/方形切换后重新评估
+  })();
+
+  // 工具钮抽屉(仅小屏幕生效,见 max-width:600px 里的 CSS):点"⋯"展开/收起下面三个
+  // 真正的按钮,再点一次或点抽屉外任意位置收起。桌面端 .tools-toggle 本来就
+  // display:none,这里的开关状态不会影响桌面端观感。
+  (function initToolsDrawer() {
+    const wrap = el('tools'), toggle = el('tools-toggle');
+    if (!wrap || !toggle) return;
+    const setOpen = on => {
+      wrap.classList.toggle('open', on);
+      toggle.classList.toggle('on', on);
+      toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+    };
+    toggle.addEventListener('click', e => {
+      e.stopPropagation();
+      setOpen(!wrap.classList.contains('open'));
+    });
+    document.addEventListener('click', e => {
+      if (wrap.classList.contains('open') && !wrap.contains(e.target)) setOpen(false);
+    });
   })();
 
   // 黑胶 / 方形 切换(记忆到 localStorage，右上角小圆钮)。
