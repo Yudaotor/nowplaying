@@ -687,7 +687,7 @@
   // 见 collector/enrich.go)，而不是写死"来自网易云"——封面/歌词各自可能来自网易云/
   // QQ音乐/LRCLIB 三个不同平台，也可能哪个平台都没解析到。
   function sourceLabel(src) {
-    if (src === 'netease') return '网易云';
+    if (src === 'netease') return '网易云音乐';
     if (src === 'qq') return 'QQ音乐';
     if (src === 'kugou') return '酷狗音乐';
     if (src === 'lrclib') return 'LRCLIB';
