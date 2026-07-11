@@ -544,6 +544,11 @@
   // 一样就同步"的逻辑当成"服务端确认没有"直接清空——图片等于先显示了一下又被自己清掉
   // (实测坐实:2026-07-10)。
   let fallbackTriedKey = '';
+  // 换成新曲目、这一轮暂时没封面(服务端 enrich 还没跑完、客户端 iTunes 兜底也没搜到)时,
+  // 不立刻拍黑清空,先记一个延迟清空定时器——多等一轮 poll(POLL_MS + 余量),真封面几乎
+  // 总能在这段时间内从服务端回来直接覆盖掉,清空分支只在真等满了还是没有时才兜底触发。
+  let clearArtTimer = null;
+  let artResolvedKey = ''; // 已经拿到过非空封面的 key,配合 clearArtTimer 判断是否该真的清空
   async function paint(s) {
     const title = s.title || '未知曲目';
     const artist = s.artist || '';
@@ -599,9 +604,24 @@
         imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`;
         lastAppliedArt = art;
       }
+      artResolvedKey = key;
+      if (clearArtTimer) { clearTimeout(clearArtTimer); clearArtTimer = null; }
     } else if (!sameTrack) {
-      imgEl.removeAttribute('src'); el('bg').style.backgroundImage = '';
-      lastAppliedArt = '';
+      // 刚换的这首暂时没封面:先留着上一首的封面/背景不动,给服务端一轮 poll 的时间把真
+      // 封面带回来(上面 art 非空分支不看 sameTrack,拿到就会立刻覆盖)——避免"切歌瞬间
+      // 拍黑、几秒后又突然恢复"这种视觉突兀(实测坐实:2026-07-11,POLL_MS=10s 时旧逻辑
+      // 换歌立刻清空,期间背景/封面直接露出纯黑底)。真等满一轮 poll 还是没有才兜底清空。
+      // 每次真的换新曲目(!sameTrack 只在 key 变化的那一次为真)都重新起一个定时器、顶掉
+      // 上一个还没触发的——不会因为快速连续切歌而漏排上新曲目自己的兜底清空。
+      if (clearArtTimer) clearTimeout(clearArtTimer);
+      const forKey = key;
+      clearArtTimer = setTimeout(() => {
+        clearArtTimer = null;
+        if (curKey === forKey && artResolvedKey !== forKey) {
+          imgEl.removeAttribute('src'); el('bg').style.backgroundImage = '';
+          lastAppliedArt = '';
+        }
+      }, POLL_MS + 2000);
     }
     imgEl.style.opacity = 1;
     setLinks(s.links || {});
