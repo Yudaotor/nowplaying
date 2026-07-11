@@ -116,31 +116,38 @@
   .art.playing { animation: breathe 3.8s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) { .art.playing { animation: none; } }
   /* ---- 黑胶模式(开关切换,存 localStorage)：外圈黑色带纹路胶片(静止),中心小圆放封面
-     当唱片标签(播放时旋转),叠唱臂 ---- */
+     当唱片标签(播放时旋转),叠唱臂 ---- 参考实拍黑胶质感:弧形高光模拟表面光泽、纹路
+     更细密、封面标签缩小让黑胶本体露出更多、唱臂改成极简线条+两个端点圆点(非写实
+     拆件式唱臂),都是照着参考图调的。 */
   .disc, .tonearm { display: none; }
-  /* 黑胶盘:黑色 + 细纹路凹槽,accent 光晕。中心留给封面标签。 */
+  /* 黑胶盘:深黑基底 + 细密纹路凹槽 + 两处弧形高光(模拟黑胶表面光泽的反光,不是平面
+     纯色),边缘略压暗增加"鼓面"立体感。 */
   .art-wrap.vinyl .disc {
     display: block; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
     background:
-      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.05) 0 1px, transparent 1px 4px),
-      radial-gradient(circle at 50% 50%, #131316 0 100%);
-    box-shadow: 0 16px 48px rgba(0,0,0,.6), 0 0 30px -4px var(--accent, transparent);
+      radial-gradient(72% 52% at 25% 10%, rgba(255,255,255,.4), transparent 58%),
+      radial-gradient(52% 40% at 80% 86%, rgba(255,255,255,.1), transparent 62%),
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.04) 0 1px, transparent 1px 3px),
+      radial-gradient(circle at 50% 50%, #1a1a1e 0%, #0a0a0c 78%, #030304 100%);
+    box-shadow: 0 20px 55px rgba(0,0,0,.65), inset 0 0 0 1px rgba(255,255,255,.05), 0 0 30px -4px var(--accent, transparent);
   }
-  /* 专辑封面缩成中心小圆(唱片标签),播放时慢速旋转。 */
+  /* 专辑封面缩成中心小圆(唱片标签),比例调小让黑胶本体露出更多(参考图里标签明显小于
+     整张黑胶);外圈叠一圈深色+一圈细亮边模拟"标签嵌进胶片"的立体分层,播放时慢速旋转。 */
   .art-wrap.vinyl .art {
-    position: absolute; left: 17%; top: 17%; width: 66%; height: 66%;
-    border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.55); z-index: 2;
+    position: absolute; left: 23%; top: 23%; width: 54%; height: 54%;
+    border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.6), 0 0 0 4px rgba(255,255,255,.06), inset 0 2px 10px rgba(0,0,0,.4); z-index: 2;
   }
   /* 转速由 JS(Web Animations API)接管,见 initVinylSpin——暂停/恢复要衔接"当前转到哪个
      角度了",纯 CSS keyframe 重启会看起来跳变;这里显式关掉 CSS 版避免叠加。 */
   .art-wrap.vinyl .art.playing { animation: none; }
-  /* 唱臂:暂停时抬起(42°离盘)、播放时落到唱片外圈(8°)，平滑摆动。 */
-  .art-wrap.vinyl .tonearm { display: block; position: absolute; top: 14px; right: 2px; width: 126px; height: 16px; transform-origin: right center; transform: rotate(42deg); transition: transform .6s ease; pointer-events: none; z-index: 3; }
+  /* 唱臂:极简线条+两个端点圆点(参考图样式,非写实拆件式唱臂)。head(靠盘一侧,悬臂
+     摆动端)在左、pivot(固定支点)在右,呼应原本"暂停时抬起(42°离盘)、播放时落到唱片
+     外圈(8°)"的旋转逻辑不变,只换视觉表现。 */
+  .art-wrap.vinyl .tonearm { display: block; position: absolute; top: 2px; right: -2px; width: 118px; height: 40px; transform-origin: 95% 42%; transform: rotate(42deg); transition: transform .6s ease; pointer-events: none; z-index: 3; overflow: visible; }
   .art-wrap.vinyl.playing .tonearm { transform: rotate(8deg); }
   @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .tonearm { transition: none; } }
-  .tonearm .bar { position: absolute; right: 8px; top: 6px; width: 106px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, #c8cdd6, #8a91a0); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
-  .tonearm .pivot { position: absolute; right: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle, #e6e9ee, #8a91a0); }
-  .tonearm .head { position: absolute; left: 6px; top: 2px; width: 14px; height: 11px; border-radius: 2px; background: #e6e9ee; }
+  .tonearm polyline { fill: none; stroke: #eef0f4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+  .tonearm circle { fill: #eef0f4; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
   /* 卡片右上角工具钮组(主题/黑胶/沉浸),共享 .tool-btn 样式。 */
   .tools { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 6px; }
   .tool-btn {
@@ -396,7 +403,11 @@
   <div id="art-wrap" class="art-wrap">
     <div class="disc"></div>
     <img id="art" class="art" alt="" referrerpolicy="no-referrer">
-    <div class="tonearm"><div class="pivot"></div><div class="bar"></div><div class="head"></div></div>
+    <svg class="tonearm" viewBox="0 0 118 40" aria-hidden="true">
+      <polyline points="8,32 54,9 112,17"/>
+      <circle cx="8" cy="32" r="4.5"/>
+      <circle cx="112" cy="17" r="4.5"/>
+    </svg>
     <button id="preview-btn" class="preview-btn hidden" aria-label="试听 30 秒" title="试听 30 秒（iTunes 预览）">▶</button>
   </div>
   <div id="status" class="status">
