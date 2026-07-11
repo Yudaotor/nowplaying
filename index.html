@@ -131,10 +131,11 @@
       radial-gradient(circle at 50% 50%, #1a1a1e 0%, #0a0a0c 78%, #030304 100%);
     box-shadow: 0 20px 55px rgba(0,0,0,.65), inset 0 0 0 1px rgba(255,255,255,.05), 0 0 30px -4px var(--accent, transparent);
   }
-  /* 专辑封面缩成中心小圆(唱片标签),比例调小让黑胶本体露出更多(参考图里标签明显小于
-     整张黑胶);外圈叠一圈深色+一圈细亮边模拟"标签嵌进胶片"的立体分层,播放时慢速旋转。 */
+  /* 专辑封面缩成中心圆(唱片标签),比例照参考图实测像素量出来:黑胶本体只露出很窄一圈
+     边(约7~8%半径),封面几乎铺满整个圆盘;外圈叠一圈深色+一圈细亮边模拟"标签嵌进
+     胶片"的立体分层,播放时慢速旋转。 */
   .art-wrap.vinyl .art {
-    position: absolute; left: 23%; top: 23%; width: 54%; height: 54%;
+    position: absolute; left: 7.5%; top: 7.5%; width: 85%; height: 85%;
     border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.6), 0 0 0 4px rgba(255,255,255,.06), inset 0 2px 10px rgba(0,0,0,.4); z-index: 2;
   }
   /* 转速由 JS(Web Animations API)接管,见 initVinylSpin——暂停/恢复要衔接"当前转到哪个
