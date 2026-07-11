@@ -694,7 +694,7 @@
           const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 }));
           persistHistory(items);
           renderHistory(items);
-          renderTodayStat(d.items.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
+          renderTodayStatSmart(d.items);
           getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
         }
@@ -780,6 +780,30 @@
     });
   }
 
+  // relay 路径的今日统计:/history 最多给 200 条(HIST_MAX),正常一天远不到、直接用最快。
+  // 但配合单曲循环重复计次(见 loop restart),一天真放出 200+ 条时最旧的会被 /history
+  // 截断顶出去导致漏计——判断依据:这 200 条里最旧的一条如果仍然是"今天"，说明可能还有
+  // 更早的今天记录被截断在外，这时才退化成跟 LB 兜底路径一样的直连 LB 翻页
+  // (collectTodayListens，已经验证过能覆盖完整)。这个信号在正常日子几乎不会触发,不影响
+  // relay 本身的国内访问加速。
+  async function renderTodayStatSmart(relayItems) {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const cutoff = Math.floor(midnight.getTime() / 1000);
+    const oldest = relayItems[relayItems.length - 1];
+    if (!oldest || (oldest.listenedAt || 0) < cutoff) {
+      renderTodayStat(relayItems.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
+      return;
+    }
+    try {
+      const re = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/listens?count=100`, 12000);
+      const listens = (re.payload && re.payload.listens) || [];
+      const today = await collectTodayListens(listens);
+      renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
+    } catch (e) {
+      // 直连也失败:退而求其次用手头这 200 条算(好过完全不显示)，这条分支本来就极少触发。
+      renderTodayStat(relayItems.map(x => ({ listenedAt: x.listenedAt || 0, durationMs: x.durationMs })));
+    }
+  }
   // 今日收听统计:输入归一化条目 [{listenedAt(秒), durationMs}]。按本地当天 0 点过滤。
   // 时长优先用各条 durationMs;iPhone 经 Last.fm 桥接的没有时长,用当天已知时长的均值补估、
   // 并标"约",不假装精确。
