@@ -1533,7 +1533,7 @@
         const already = localStorage.getItem(KEY) === '1';
         const d = already ? await fetchJSON(`${RELAY}/visit`, 6000) : await postJSON(`${RELAY}/visit`, {}, 6000);
         if (d && d.ok && typeof d.total === 'number') {
-          elm.textContent = `访问次数：${d.total.toLocaleString('zh-CN')}`;
+          elm.textContent = `页面访问次数：${d.total.toLocaleString('zh-CN')}`;
           elm.classList.remove('hidden');
           if (!already) { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
         }
