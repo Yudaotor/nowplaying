@@ -325,8 +325,9 @@
   }
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .preview-btn.playing { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
-  /* ---- 表情反应(2026-07-12新增):按当前歌曲(artist|title)计数,随 paint() 换歌/每轮
-     poll 一起刷新,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。 ---- */
+  /* ---- 表情反应(2026-07-12新增):全站统一一份计数,跟哪首歌没关系(最初设计成按歌曲
+     分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。跟留言墙共用 60s 刷新节奏,
+     不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。 ---- */
   .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
   .reaction-btn {
     display: inline-flex; align-items: center; gap: 5px;
@@ -524,7 +525,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
-  <div id="reactions" class="reactions hidden"></div>
+  <div id="reactions" class="reactions"></div>
   </div><!-- /.np -->
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
@@ -687,8 +688,6 @@
     const key = `${artist}|${title}`;
     const sameTrack = key === curKey;
     curKey = key;
-    el('reactions').classList.remove('hidden');
-    if (window.__reactionsForKey) window.__reactionsForKey(key);
     let art = s.artwork || '';
     const imgEl = el('art');
     if (!sameTrack) {
@@ -1068,8 +1067,6 @@
     setLinks({});
     setAccent('');
     setStale(false);
-    el('reactions').classList.add('hidden');
-    if (window.__reactionsForKey) window.__reactionsForKey('');
   }
 
   // ---- 同步歌词 ----:采集器把网易云的 原文/翻译/罗马音(逐行 LRC)+ 逐字(yrc)塞进
@@ -1539,9 +1536,10 @@
     })();
   })();
 
-  // 表情反应(2026-07-12新增):按当前歌曲(artist|title)计数,paint() 换歌/每轮 poll 都会调
-  // window.__reactionsForKey(key) 触发换歌重置(key 变了先清空再拉)或原地刷新(key 没变,
-  // 别人刚点的反应也能看到)。真正防刷在后端,这里的按钮禁用只是防误触双击。
+  // 表情反应(2026-07-12新增,当天改成全局):最初设计成按当前歌曲分开计数,用户反馈
+  // 预期跟留言墙一样是全站统一一份、跟哪首歌没关系,改成一次性加载 + 跟留言墙共用 60s
+  // 刷新节奏(见 bootstrap 的 window.__fetchComments 那行,一并调用)。真正防刷在后端,
+  // 这里的按钮禁用只是防误触双击。
   (function initReactions() {
     const REACTION_EMOJI = ['❤️', '🔥', '👍', '🎉', '😮', '😢'];
     const wrap = el('reactions');
@@ -1555,35 +1553,29 @@
       wrap.appendChild(b);
       btns[emo] = b;
     }
-    let curReactKey = '', reqSeq = 0;
     function paintCounts(counts) {
       for (const emo of REACTION_EMOJI) {
         const c = (counts && counts[emo]) || 0;
         btns[emo].querySelector('.r-count').textContent = c > 0 ? c : '';
       }
     }
-    async function refetch(key) {
-      const seq = ++reqSeq;
+    async function fetchReactions() {
       try {
-        const d = await fetchJSON(`${RELAY}/reactions?key=${encodeURIComponent(key)}`, 6000);
-        if (seq !== reqSeq || key !== curReactKey) return; // 换歌了/被更晚的请求顶替,丢弃这次结果
+        const d = await fetchJSON(`${RELAY}/reactions`, 6000);
         if (d && d.ok) paintCounts(d.counts || {});
       } catch (e) {}
     }
     async function react(emo) {
-      if (!curReactKey) return;
       const b = btns[emo];
       b.disabled = true;
       try {
-        const d = await postJSON(`${RELAY}/reactions`, { key: curReactKey, emoji: emo }, 6000);
-        if (d && d.ok && curReactKey === d.key) paintCounts(d.counts || {});
+        const d = await postJSON(`${RELAY}/reactions`, { emoji: emo }, 6000);
+        if (d && d.ok) paintCounts(d.counts || {});
       } catch (e) {}
       setTimeout(() => { b.disabled = false; }, 800);
     }
-    window.__reactionsForKey = key => {
-      if (key !== curReactKey) { curReactKey = key; paintCounts({}); }
-      if (key) refetch(key);
-    };
+    window.__fetchReactions = fetchReactions;
+    fetchReactions();
   })();
 
   // 留言墙(2026-07-12新增):挂在 .side 里,历史列表之后。渲染全程用 textContent/
@@ -1653,9 +1645,17 @@
   // 历史(74KB)延后,先让实时 now-playing 那条小请求抢到连接、卡片更快出。
   setTimeout(fetchHistory, 800);
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
-  setInterval(() => { if (!document.hidden) { fetchHistory(); if (window.__fetchComments) window.__fetchComments(); } }, 60000);
+  setInterval(() => { if (!document.hidden) {
+    fetchHistory();
+    if (window.__fetchComments) window.__fetchComments();
+    if (window.__fetchReactions) window.__fetchReactions();
+  } }, 60000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { tick(); fetchHistory(); if (window.__fetchComments) window.__fetchComments(); }
+    if (!document.hidden) {
+      tick(); fetchHistory();
+      if (window.__fetchComments) window.__fetchComments();
+      if (window.__fetchReactions) window.__fetchReactions();
+    }
   });
 
   // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
