@@ -325,6 +325,58 @@
   }
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .preview-btn.playing { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
+  /* ---- 表情反应(2026-07-12新增):按当前歌曲(artist|title)计数,随 paint() 换歌/每轮
+     poll 一起刷新,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。 ---- */
+  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+  .reaction-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.08); color: #eef0f4; font-size: 15px; line-height: 1;
+    cursor: pointer; transition: background .2s ease, transform .1s ease, border-color .2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .reaction-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
+  .reaction-btn:disabled { opacity: .6; cursor: default; transform: none; }
+  .r-count { font-size: 11px; font-weight: 700; color: #9aa3b2; font-variant-numeric: tabular-nums; min-width: 8px; }
+  /* ---- 留言墙(2026-07-12新增):挂在 .side 里、历史列表之后,复用 .history-wrap/.history
+     的滚动列表样式。留言内容用 textContent 渲染(见 initComments),天然防 XSS,后端不做
+     二次转义(转义后再 textContent 会把 &lt; 这类符号原样显示给所有人看,是错的)。 ---- */
+  .comments-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  .comments-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 8px; }
+  .comments {
+    display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px;
+    max-height: 200px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent;
+  }
+  .comments::-webkit-scrollbar { width: 6px; }
+  .comments::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+  .comments::-webkit-scrollbar-track { background: transparent; }
+  .comments-empty { font-size: 12px; color: #6b7280; padding: 6px 2px; }
+  .comment-row { padding: 6px 2px; }
+  .c-head { display: flex; align-items: baseline; gap: 8px; }
+  .c-name { font-size: 12px; font-weight: 700; color: #c8cdd6; }
+  .c-time { font-size: 10px; color: #6b7280; }
+  .c-text { font-size: 13px; color: #dfe2e7; margin-top: 2px; overflow-wrap: anywhere; }
+  .comment-form { display: flex; flex-wrap: wrap; gap: 8px; }
+  .comment-name-input, .comment-text {
+    padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06); color: #f5f6f8; font-size: 13px; font-family: inherit;
+  }
+  .comment-name-input { width: 84px; flex-shrink: 0; font-size: 12px; }
+  .comment-text { flex: 1 1 160px; min-width: 0; }
+  .comment-name-input::placeholder, .comment-text::placeholder { color: #6b7280; }
+  .comment-name-input:focus, .comment-text:focus { outline: none; border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); }
+  .comment-submit {
+    flex-shrink: 0; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.08); color: #eef0f4; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .2s ease;
+  }
+  .comment-submit:hover { background: rgba(255,255,255,.16); }
+  .comment-submit:disabled { opacity: .5; cursor: default; }
+  /* ---- 访客计数(2026-07-12新增):挂在 footer-meta 旁边(是兄弟元素,不是子元素!
+     renderSourceMeta() 每轮 poll 都会整体覆写 #footer-meta 的 textContent,放里面会被
+     反复清空)。localStorage 的 np:visited 去重:同一浏览器只在"从未访问过"时才 POST 一次。 ---- */
+  .visitor-count { margin-top: 4px; font-size: 11px; color: #6b7280; }
   /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / light=浅色 ---- */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
@@ -354,6 +406,20 @@
   :root[data-theme="light"] .ic { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
   :root[data-theme="light"] .ic:hover { background: rgba(0,0,0,.1); }
   :root[data-theme="light"] .tool-btn { color: #5a616e; border-color: rgba(0,0,0,.14); background: rgba(0,0,0,.05); }
+  :root[data-theme="light"] .reaction-btn { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
+  :root[data-theme="light"] .reaction-btn:hover { background: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .r-count { color: #7a828f; }
+  :root[data-theme="light"] .comments-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .comments-title,
+  :root[data-theme="light"] .comments-empty,
+  :root[data-theme="light"] .c-time,
+  :root[data-theme="light"] .visitor-count { color: #7a828f; }
+  :root[data-theme="light"] .c-name,
+  :root[data-theme="light"] .c-text { color: #2a2e37; }
+  :root[data-theme="light"] .comment-name-input,
+  :root[data-theme="light"] .comment-text,
+  :root[data-theme="light"] .comment-submit { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
+  :root[data-theme="light"] .comment-submit:hover { background: rgba(0,0,0,.1); }
   /* ---- 沉浸/全屏模式(data-immersive):溶解卡片、放大封面+歌词、隐藏杂项,适合平板/副屏常驻 ---- */
   :root[data-immersive] body { padding: 0; }
   :root[data-immersive] .tools { top: 18px; right: 18px; opacity: .3; }
@@ -361,8 +427,11 @@
   :root[data-immersive] .card,
   :root[data-immersive] .card.two-col { width: min(96vw, 1200px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: none; padding: 3vh 4vw; }
   :root[data-immersive] .links,
+  :root[data-immersive] .reactions,
   :root[data-immersive] .history-wrap,
+  :root[data-immersive] .comments-wrap,
   :root[data-immersive] .meta,
+  :root[data-immersive] .visitor-count,
   :root[data-immersive] .album { display: none; }
   :root[data-immersive] .art-wrap { width: min(40vh, 360px); height: min(40vh, 360px); }
   :root[data-immersive] h1 { font-size: clamp(24px, 3.4vw, 40px); }
@@ -386,10 +455,13 @@
     .artist { font-size: 15px; }
     .progress { margin-top: 16px; }
     .links { margin-top: 16px; gap: 12px; }
+    .reactions { margin-top: 12px; gap: 8px; }
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
     .history-wrap { margin-top: 16px; padding-top: 14px; }
     .history { max-height: 220px; }
+    .comments-wrap { margin-top: 16px; padding-top: 14px; }
+    .comments { max-height: 160px; }
     .meta { margin-top: 16px; }
     /* 工具钮抽屉:小屏幕横排三个圆钮会跟黑胶模式下悬在封面右上方的唱臂图形打架
        (实测坐实:2026-07-11)。平时只露一个"⋯"入口,点开才竖着展开三个真正的按钮,
@@ -452,6 +524,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
+  <div id="reactions" class="reactions hidden"></div>
   </div><!-- /.np -->
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
@@ -469,8 +542,18 @@
     </div>
     <div id="history" class="history"></div>
   </div>
+  <div id="comments-wrap" class="comments-wrap">
+    <div class="comments-title">留言</div>
+    <div id="comments" class="comments"></div>
+    <form id="comment-form" class="comment-form">
+      <input id="comment-name" class="comment-name-input" type="text" placeholder="昵称(可选)" maxlength="20">
+      <input id="comment-text" class="comment-text" type="text" placeholder="留句话…" maxlength="200" required>
+      <button id="comment-submit" class="comment-submit" type="submit">发送</button>
+    </form>
+  </div>
   </div><!-- /.side -->
   <div id="footer-meta" class="meta">Apple Music</div>
+  <div id="visitor-count" class="visitor-count hidden"></div>
 </main>
 <script>
 (() => {
@@ -604,6 +687,8 @@
     const key = `${artist}|${title}`;
     const sameTrack = key === curKey;
     curKey = key;
+    el('reactions').classList.remove('hidden');
+    if (window.__reactionsForKey) window.__reactionsForKey(key);
     let art = s.artwork || '';
     const imgEl = el('art');
     if (!sameTrack) {
@@ -983,6 +1068,8 @@
     setLinks({});
     setAccent('');
     setStale(false);
+    el('reactions').classList.add('hidden');
+    if (window.__reactionsForKey) window.__reactionsForKey('');
   }
 
   // ---- 同步歌词 ----:采集器把网易云的 原文/翻译/罗马音(逐行 LRC)+ 逐字(yrc)塞进
@@ -1080,9 +1167,12 @@
     wrap.classList.toggle('show', show);
     updateLayout();
   }
-  // 有侧栏内容(歌词/历史)时才在宽屏铺两栏；纯空闲(无历史)保持单列居中小卡。
+  // 有侧栏内容(歌词/历史/留言墙)时才在宽屏铺两栏;留言墙(2026-07-12新增)常驻显示、
+  // 从不加 hidden,所以这个 || 分支目前恒为真——写成 classList 判断而不是直接 || true,
+  // 是为了以后如果给留言墙也加"空内容时隐藏"之类的逻辑,这里不用跟着改。
   function updateLayout() {
-    const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden');
+    const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden')
+      || !el('comments-wrap').classList.contains('hidden');
     document.querySelector('.card').classList.toggle('two-col', hasSide);
   }
   function syncLyrics(posMs) {
@@ -1175,6 +1265,18 @@
     const to = setTimeout(() => ctl.abort(), ms || 8000);
     try { return await (await fetch(url, { cache: 'no-store', signal: ctl.signal })).json(); }
     finally { clearTimeout(to); }
+  }
+  // fetchJSON 的写版本兄弟函数,给访客留言/表情反应/计数三个新接口用(此前页面全程只读)。
+  async function postJSON(url, body, ms) {
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), ms || 8000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST', cache: 'no-store', signal: ctl.signal,
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}),
+      });
+      return await res.json();
+    } finally { clearTimeout(to); }
   }
 
   // 取一次状态：优先自建中继 /now(采集器直推、国内可达、不受 LB 抽风影响);中继本身
@@ -1417,6 +1519,123 @@
     });
   })();
 
+  // 访客计数(2026-07-12新增):localStorage 的 np:visited 去重——没这个标记就 POST 一次
+  // (后端 +1 并返回总数),打上标记;有标记就只 GET 读总数,不再增加。清缓存/换浏览器/
+  // 无痕模式会被重新计入,是用户自己要求的方案,接受这个已知代价。
+  (function initVisitorCounter() {
+    const elm = el('visitor-count');
+    if (!elm || !RELAY) return;
+    const KEY = 'np:visited';
+    (async () => {
+      try {
+        const already = localStorage.getItem(KEY) === '1';
+        const d = already ? await fetchJSON(`${RELAY}/visit`, 6000) : await postJSON(`${RELAY}/visit`, {}, 6000);
+        if (d && d.ok && typeof d.total === 'number') {
+          elm.textContent = `第 ${d.total.toLocaleString('zh-CN')} 位访客`;
+          elm.classList.remove('hidden');
+          if (!already) { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+        }
+      } catch (e) {}
+    })();
+  })();
+
+  // 表情反应(2026-07-12新增):按当前歌曲(artist|title)计数,paint() 换歌/每轮 poll 都会调
+  // window.__reactionsForKey(key) 触发换歌重置(key 变了先清空再拉)或原地刷新(key 没变,
+  // 别人刚点的反应也能看到)。真正防刷在后端,这里的按钮禁用只是防误触双击。
+  (function initReactions() {
+    const REACTION_EMOJI = ['❤️', '🔥', '👍', '🎉', '😮', '😢'];
+    const wrap = el('reactions');
+    if (!wrap || !RELAY) return;
+    const btns = {};
+    for (const emo of REACTION_EMOJI) {
+      const b = document.createElement('button');
+      b.className = 'reaction-btn'; b.type = 'button';
+      b.innerHTML = `<span class="r-emoji">${emo}</span><span class="r-count"></span>`;
+      b.addEventListener('click', () => react(emo));
+      wrap.appendChild(b);
+      btns[emo] = b;
+    }
+    let curReactKey = '', reqSeq = 0;
+    function paintCounts(counts) {
+      for (const emo of REACTION_EMOJI) {
+        const c = (counts && counts[emo]) || 0;
+        btns[emo].querySelector('.r-count').textContent = c > 0 ? c : '';
+      }
+    }
+    async function refetch(key) {
+      const seq = ++reqSeq;
+      try {
+        const d = await fetchJSON(`${RELAY}/reactions?key=${encodeURIComponent(key)}`, 6000);
+        if (seq !== reqSeq || key !== curReactKey) return; // 换歌了/被更晚的请求顶替,丢弃这次结果
+        if (d && d.ok) paintCounts(d.counts || {});
+      } catch (e) {}
+    }
+    async function react(emo) {
+      if (!curReactKey) return;
+      const b = btns[emo];
+      b.disabled = true;
+      try {
+        const d = await postJSON(`${RELAY}/reactions`, { key: curReactKey, emoji: emo }, 6000);
+        if (d && d.ok && curReactKey === d.key) paintCounts(d.counts || {});
+      } catch (e) {}
+      setTimeout(() => { b.disabled = false; }, 800);
+    }
+    window.__reactionsForKey = key => {
+      if (key !== curReactKey) { curReactKey = key; paintCounts({}); }
+      if (key) refetch(key);
+    };
+  })();
+
+  // 留言墙(2026-07-12新增):挂在 .side 里,历史列表之后。渲染全程用 textContent/
+  // createElement(不用 innerHTML),后端也不做转义——两边配合天然防 XSS(见 CSS 里
+  // .comments-wrap 上方注释)。跟历史列表共用 60s 刷新节奏(见 bootstrap),不单独起轮询。
+  (function initComments() {
+    const wrap = el('comments-wrap'), box = el('comments'), form = el('comment-form'),
+          nameInput = el('comment-name'), textInput = el('comment-text'), submitBtn = el('comment-submit');
+    if (!wrap || !box || !form || !RELAY) return;
+    let sig = '';
+    function render(items) {
+      const s = items.map(c => `${c.id}|${c.name}|${c.text}`).join('\n');
+      if (s === sig) return;
+      sig = s;
+      box.textContent = '';
+      if (!items.length) {
+        const empty = document.createElement('div'); empty.className = 'comments-empty'; empty.textContent = '还没有留言,来写第一条吧';
+        box.appendChild(empty);
+        return;
+      }
+      for (const c of items) {
+        const row = document.createElement('div'); row.className = 'comment-row';
+        const head = document.createElement('div'); head.className = 'c-head';
+        const name = document.createElement('span'); name.className = 'c-name'; name.textContent = c.name || '匿名';
+        const time = document.createElement('span'); time.className = 'c-time'; time.textContent = relTime(Math.floor((c.at || 0) / 1000));
+        head.appendChild(name); head.appendChild(time);
+        const text = document.createElement('div'); text.className = 'c-text'; text.textContent = c.text || '';
+        row.appendChild(head); row.appendChild(text);
+        box.appendChild(row);
+      }
+    }
+    async function fetchComments() {
+      try {
+        const d = await fetchJSON(`${RELAY}/comments`, 6000);
+        if (d && d.ok && Array.isArray(d.items)) render(d.items);
+      } catch (e) {}
+    }
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const text = textInput.value.trim();
+      if (!text) return;
+      submitBtn.disabled = true;
+      try {
+        const d = await postJSON(`${RELAY}/comments`, { name: nameInput.value.trim(), text }, 6000);
+        if (d && d.ok && Array.isArray(d.items)) { textInput.value = ''; render(d.items); }
+      } catch (e) {}
+      submitBtn.disabled = false;
+    });
+    window.__fetchComments = fetchComments;
+    fetchComments();
+  })();
+
   // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。历史列表也一并用缓存先铺出来
   // (决定两栏版式的 updateLayout() 就看历史区是否隐藏),这样进度条/歌词/历史/两栏宽卡
   // 都在第一帧就是最终形状,tick()/fetchHistory() 落地后只是刷新内容,不再整体改版式。
@@ -1434,8 +1653,10 @@
   // 历史(74KB)延后,先让实时 now-playing 那条小请求抢到连接、卡片更快出。
   setTimeout(fetchHistory, 800);
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
-  setInterval(() => { if (!document.hidden) fetchHistory(); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); fetchHistory(); } });
+  setInterval(() => { if (!document.hidden) { fetchHistory(); if (window.__fetchComments) window.__fetchComments(); } }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { tick(); fetchHistory(); if (window.__fetchComments) window.__fetchComments(); }
+  });
 
   // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
   if ('serviceWorker' in navigator) {

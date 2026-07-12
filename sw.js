@@ -3,7 +3,7 @@
 // - 封面(p*.music.126/127.net)：cache-first —— 命中直接返回(秒显)，未命中拉网并入缓存
 //   (opaque no-cors 响应也能存)，容量上限 ~40 张、FIFO 淘汰，避免无限增长。
 // - 其它跨域(LB、iTunes 等数据请求)不拦，直接走网络。
-const SHELL = 'np-shell-v3';
+const SHELL = 'np-shell-v4';
 const COVERS = 'np-covers-v1';
 const COVER_MAX = 40;
 
