@@ -679,7 +679,7 @@
     el('art-wrap').classList.toggle('playing', live); // 黑胶唱臂落下/抬起
     if (window.setVinylPlaying) window.setVinylPlaying(live); // 黑胶转速缓动(WAAPI)
     el('progress').classList.toggle('is-live', live); // 播放头呼吸光晕只在真正播放时出现
-    el('status-text').textContent = live ? '正在播放'
+    el('status-text').textContent = live ? '他正在播放'
       : paused ? '已暂停'
       : (s.listenedAt ? `上次播放 · ${relTime(s.listenedAt)}` : '最近播放');
     // 设备来源:笔记本=Mac / 手机=iPhone 线描图标(同款 DEV_ICON,currentColor 跟随状态胶囊:播放绿/暂停灰)。未知不显示。
