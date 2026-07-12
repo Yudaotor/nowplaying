@@ -326,9 +326,12 @@
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .preview-btn.playing { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
   /* ---- 表情反应(2026-07-12新增):全站统一一份计数,跟哪首歌没关系(最初设计成按歌曲
-     分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。跟留言墙共用 60s 刷新节奏,
-     不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。 ---- */
-  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+     分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。挂在 .comments-wrap 里、"留言"
+     标题正上方(用户反馈这个跟留言一样是"评论区"性质的东西,当天从 .np 挪过来的),跟
+     留言墙共用 60s 刷新节奏,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做
+     按钮级防抖。左对齐跟下面的"留言"标题/列表对齐,不再居中(居中是挂在封面下面时的
+     版式,挪进左对齐的评论区后改回左对齐更协调)。 ---- */
+  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; margin: 0 0 14px; }
   .reaction-btn {
     display: inline-flex; align-items: center; gap: 5px;
     height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
@@ -428,12 +431,13 @@
   :root[data-immersive] .card,
   :root[data-immersive] .card.two-col { width: min(96vw, 1200px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: none; padding: 3vh 4vw; }
   :root[data-immersive] .links,
-  :root[data-immersive] .reactions,
   :root[data-immersive] .history-wrap,
   :root[data-immersive] .comments-wrap,
   :root[data-immersive] .meta,
   :root[data-immersive] .visitor-count,
   :root[data-immersive] .album { display: none; }
+  /* .reactions 现在挂在 .comments-wrap 里面(见上面 CSS 注释),父级隐藏子级自然跟着
+     隐藏,不用再单独列一条选择器。 */
   :root[data-immersive] .art-wrap { width: min(40vh, 360px); height: min(40vh, 360px); }
   :root[data-immersive] h1 { font-size: clamp(24px, 3.4vw, 40px); }
   :root[data-immersive] .artist { font-size: clamp(15px, 1.8vw, 22px); }
@@ -456,7 +460,7 @@
     .artist { font-size: 15px; }
     .progress { margin-top: 16px; }
     .links { margin-top: 16px; gap: 12px; }
-    .reactions { margin-top: 12px; gap: 8px; }
+    .reactions { gap: 8px; margin-bottom: 12px; }
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
     .history-wrap { margin-top: 16px; padding-top: 14px; }
@@ -525,7 +529,6 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
-  <div id="reactions" class="reactions"></div>
   </div><!-- /.np -->
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
@@ -544,6 +547,7 @@
     <div id="history" class="history"></div>
   </div>
   <div id="comments-wrap" class="comments-wrap">
+    <div id="reactions" class="reactions"></div>
     <div class="comments-title">留言</div>
     <div id="comments" class="comments"></div>
     <form id="comment-form" class="comment-form">
@@ -554,7 +558,7 @@
   </div>
   </div><!-- /.side -->
   <div id="footer-meta" class="meta">Apple Music</div>
-  <div id="visitor-count" class="visitor-count hidden"></div>
+  <div id="visitor-count" class="visitor-count hidden" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
 </main>
 <script>
 (() => {
@@ -1528,7 +1532,7 @@
         const already = localStorage.getItem(KEY) === '1';
         const d = already ? await fetchJSON(`${RELAY}/visit`, 6000) : await postJSON(`${RELAY}/visit`, {}, 6000);
         if (d && d.ok && typeof d.total === 'number') {
-          elm.textContent = `第 ${d.total.toLocaleString('zh-CN')} 位访客`;
+          elm.textContent = `访问次数：${d.total.toLocaleString('zh-CN')}`;
           elm.classList.remove('hidden');
           if (!already) { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
         }
