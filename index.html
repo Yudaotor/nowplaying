@@ -385,6 +385,35 @@
   }
   .comment-submit:hover { background: rgba(255,255,255,.16); }
   .comment-submit:disabled { opacity: .5; cursor: default; }
+  /* ---- 历史播放 Top10 歌手(2026-07-14新增):挂在 .side 里、留言墙之后。数据来自采集器
+     一天推一次的 Last.fm 全时段(overall)播放榜(见 collector/topartists.go),不需要
+     实时,不挂 60s 刷新节奏、只在页面加载时拉一次(见 initTopArtists)。跟 .history-wrap/
+     .comments-wrap 同一套"细线分隔+小标题"外观,视觉上是同一族的只读小面板。 ---- */
+  .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  .top-artists-wrap.hidden { display: none; }
+  .top-artists-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 10px; }
+  .top-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 14px 6px; }
+  .ta-item { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-decoration: none; }
+  .ta-avatar-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+  .ta-avatar, .ta-avatar-fallback {
+    width: 52px; height: 52px; border-radius: 50%; display: block; object-fit: cover;
+    background: rgba(255,255,255,.08);
+  }
+  .ta-avatar-fallback {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 700; color: #9aa1ad;
+  }
+  /* 名次角标:只给前 3 名加(有信息量的是"你听最多的前几位",10 个全标反而是噪音)。 */
+  .ta-rank {
+    position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: 999px; background: var(--accent, #6b7280); color: #fff;
+    font-size: 9px; font-weight: 700; line-height: 16px; text-align: center;
+    box-shadow: 0 0 0 2px rgba(22,25,33,.9);
+  }
+  .ta-name {
+    font-size: 11px; color: #c8cdd6; text-align: center; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   /* ---- 访客计数(2026-07-12新增):挂在 footer-meta 旁边(是兄弟元素,不是子元素!
      renderSourceMeta() 每轮 poll 都会整体覆写 #footer-meta 的 textContent,放里面会被
      反复清空)。localStorage 的 np:visited 去重:同一浏览器只在"从未访问过"时才 POST 一次。 ---- */
@@ -432,6 +461,11 @@
   :root[data-theme="light"] .comment-text,
   :root[data-theme="light"] .comment-submit { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
   :root[data-theme="light"] .comment-submit:hover { background: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .top-artists-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .top-artists-title { color: #7a828f; }
+  :root[data-theme="light"] .ta-name { color: #2a2e37; }
+  :root[data-theme="light"] .ta-avatar, :root[data-theme="light"] .ta-avatar-fallback { background: rgba(0,0,0,.06); }
+  :root[data-theme="light"] .ta-rank { box-shadow: 0 0 0 2px rgba(255,255,255,.9); }
   /* ---- 沉浸/全屏模式(data-immersive):溶解卡片、放大封面+歌词、隐藏杂项,适合平板/副屏常驻 ---- */
   :root[data-immersive] body { padding: 0; }
   :root[data-immersive] .tools { top: 18px; right: 18px; opacity: .3; }
@@ -441,6 +475,7 @@
   :root[data-immersive] .links,
   :root[data-immersive] .history-wrap,
   :root[data-immersive] .comments-wrap,
+  :root[data-immersive] .top-artists-wrap,
   :root[data-immersive] .meta,
   :root[data-immersive] .visitor-count,
   :root[data-immersive] .album { display: none; }
@@ -563,6 +598,10 @@
       <input id="comment-text" class="comment-text" type="text" placeholder="留句话…" maxlength="200" required>
       <button id="comment-submit" class="comment-submit" type="submit">发送</button>
     </form>
+  </div>
+  <div id="top-artists-wrap" class="top-artists-wrap hidden">
+    <div class="top-artists-title">历史播放 Top10 歌手</div>
+    <div id="top-artists" class="top-artists"></div>
   </div>
   </div><!-- /.side -->
   <div id="footer-meta" class="meta">Apple Music</div>
@@ -1181,7 +1220,7 @@
   // 是为了以后如果给留言墙也加"空内容时隐藏"之类的逻辑,这里不用跟着改。
   function updateLayout() {
     const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden')
-      || !el('comments-wrap').classList.contains('hidden');
+      || !el('comments-wrap').classList.contains('hidden') || !el('top-artists-wrap').classList.contains('hidden');
     document.querySelector('.card').classList.toggle('two-col', hasSide);
   }
   function syncLyrics(posMs) {
@@ -1641,6 +1680,59 @@
     });
     window.__fetchComments = fetchComments;
     fetchComments();
+  })();
+
+  // 历史播放 Top10 歌手(2026-07-14新增):数据来自采集器一天推一次的 Last.fm 全时段
+  // (overall)播放榜(见 collector/topartists.go 的 topArtistsDigest),用户明确要求
+  // "不用实时更新,每天更新一次就好"——所以故意只在页面加载时拉一次,不挂进下面
+  // fetchHistory/fetchComments/fetchReactions 共用的 60s 刷新节奏:那样做只会每分钟
+  // 白打一次 KV 读请求换回同一份数据(采集器一天才写一次),纯粹浪费。头像来自 Deezer
+  // (Last.fm 自己的 artist.getinfo 已确认对所有歌手只返回同一张占位图,查不到真实头像),
+  // 单张头像加载失败(Deezer 图床偶尔挂/歌手改名搜不到)不影响其它 9 个,各自独立兜底成
+  // 圆形首字母占位。
+  (function initTopArtists() {
+    const wrap = el('top-artists-wrap'), box = el('top-artists');
+    if (!wrap || !box || !RELAY) return;
+    function fallbackAvatar(name) {
+      const d = document.createElement('div');
+      d.className = 'ta-avatar-fallback';
+      d.textContent = (name || '?').trim().charAt(0).toUpperCase() || '?';
+      return d;
+    }
+    (async () => {
+      try {
+        const d = await fetchJSON(`${RELAY}/top-artists`, 6000);
+        if (!d || !d.ok || !Array.isArray(d.artists) || !d.artists.length) return;
+        box.textContent = '';
+        d.artists.slice(0, 10).forEach((a, i) => {
+          const item = document.createElement('div');
+          item.className = 'ta-item';
+          const avatarWrap = document.createElement('div');
+          avatarWrap.className = 'ta-avatar-wrap';
+          if (a.avatar) {
+            const img = document.createElement('img');
+            img.className = 'ta-avatar'; img.loading = 'lazy'; img.alt = a.name || '';
+            img.addEventListener('error', () => img.replaceWith(fallbackAvatar(a.name)), { once: true });
+            img.src = a.avatar;
+            avatarWrap.appendChild(img);
+          } else {
+            avatarWrap.appendChild(fallbackAvatar(a.name));
+          }
+          if (i < 3) {
+            const rank = document.createElement('span');
+            rank.className = 'ta-rank'; rank.textContent = String(i + 1);
+            avatarWrap.appendChild(rank);
+          }
+          const name = document.createElement('div');
+          name.className = 'ta-name'; name.textContent = a.name || '';
+          name.title = a.playCount ? `${a.name} · ${a.playCount} 次播放` : (a.name || '');
+          item.appendChild(avatarWrap); item.appendChild(name);
+          box.appendChild(item);
+        });
+        wrap.classList.remove('hidden');
+        updateLayout();
+      } catch (e) {}
+    })();
   })();
 
   // 首屏：先用本地缓存的上一首秒渲染（不空等），再拉最新。历史列表也一并用缓存先铺出来
