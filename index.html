@@ -385,10 +385,12 @@
   }
   .comment-submit:hover { background: rgba(255,255,255,.16); }
   .comment-submit:disabled { opacity: .5; cursor: default; }
-  /* ---- 历史播放 Top10 歌手(2026-07-14新增):挂在 .side 里、留言墙之后。数据来自采集器
-     一天推一次的 Last.fm 全时段(overall)播放榜(见 collector/topartists.go),不需要
-     实时,不挂 60s 刷新节奏、只在页面加载时拉一次(见 initTopArtists)。跟 .history-wrap/
-     .comments-wrap 同一套"细线分隔+小标题"外观,视觉上是同一族的只读小面板。 ---- */
+  /* ---- 历史播放 Top10 歌手(2026-07-14新增,同天用户反馈后挪到 .np 里、播放链接行
+     .links 之后——原来挂在 .side 里、留言墙之后,用户要求换到左侧播放区下方)。数据来自
+     采集器一天推一次的 Last.fm 全时段(overall)播放榜(见 collector/topartists.go),不
+     需要实时,不挂 60s 刷新节奏、只在页面加载时拉一次(见 initTopArtists)。跟
+     .history-wrap/.comments-wrap 同一套"细线分隔+小标题"外观,视觉上是同一族的只读小
+     面板,只是现在挂在左栏而不是右栏。 ---- */
   .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .top-artists-wrap.hidden { display: none; }
   .top-artists-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 10px; }
@@ -572,6 +574,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
+  <div id="top-artists-wrap" class="top-artists-wrap hidden">
+    <div class="top-artists-title">历史播放 Top10 歌手</div>
+    <div id="top-artists" class="top-artists"></div>
+  </div>
   </div><!-- /.np -->
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
@@ -598,10 +604,6 @@
       <input id="comment-text" class="comment-text" type="text" placeholder="留句话…" maxlength="200" required>
       <button id="comment-submit" class="comment-submit" type="submit">发送</button>
     </form>
-  </div>
-  <div id="top-artists-wrap" class="top-artists-wrap hidden">
-    <div class="top-artists-title">历史播放 Top10 歌手</div>
-    <div id="top-artists" class="top-artists"></div>
   </div>
   </div><!-- /.side -->
   <div id="footer-meta" class="meta">Apple Music</div>
@@ -1219,8 +1221,10 @@
   // 从不加 hidden,所以这个 || 分支目前恒为真——写成 classList 判断而不是直接 || true,
   // 是为了以后如果给留言墙也加"空内容时隐藏"之类的逻辑,这里不用跟着改。
   function updateLayout() {
+    // top-artists-wrap 现在挂在 .np(左侧播放区)里,不算"侧栏内容",不参与这个判断——
+    // 见 initTopArtists 那次挪位置的记录。
     const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden')
-      || !el('comments-wrap').classList.contains('hidden') || !el('top-artists-wrap').classList.contains('hidden');
+      || !el('comments-wrap').classList.contains('hidden');
     document.querySelector('.card').classList.toggle('two-col', hasSide);
   }
   function syncLyrics(posMs) {
@@ -1730,7 +1734,6 @@
           box.appendChild(item);
         });
         wrap.classList.remove('hidden');
-        updateLayout();
       } catch (e) {}
     })();
   })();
