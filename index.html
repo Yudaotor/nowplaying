@@ -245,8 +245,15 @@
   .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
   .lrc-line.active .lrc-main { color: var(--accent, #f2f4f7); } /* 行级高亮(无逐字时) */
   .lrc-tr { font-size: 12px; line-height: 1.25; color: #838a97; margin-top: 1px; font-weight: 400; }
-  /* 逐字(yrc):每个词随时间从左到右"渐变扫过"填色,而不是整词硬切。--fill(0~100%)由
-     syncLyrics 每帧更新,渐变里留一段软过渡区(±9%),看起来是慢慢填满这个词。 */
+  /* 逐字(yrc):每个词随时间从左到右"渐变扫过"填色,而不是整词硬切。--fill 由 syncLyrics
+     每帧更新,渐变里留一段软过渡区(±9%),看起来是慢慢填满这个词。--fill 故意不夹到
+     [0,100]——还没轮到/早就唱完的词,真实值可能是很负/很大的百分比,交给下面 calc()
+     出来的渐变 stop 位置一起算(CSS 渐变规范本身要求 stop 位置单调不减,超出
+     [0%,100%] 可视区间的 stop 会被自动钳制成跟前一个 stop 同一位置,视觉上等价于整段
+     纯色,不会露出过渡带),不需要在 JS 里手动分支——夹到 [0,1] 反而会让"还没轮到"和
+     "刚好唱到这个词最前一刻"变成同一个值,过渡带因此在每个未唱到的词开头都露出一小截
+     不该有的高亮(英文按整词分词,这一小截接近首字母宽度,表现成"提前加载颜色";desktop-
+     lyrics(Swift)那边同一个 bug 已经修过,见其 LyricsOverlayView.swift 的 wordGradient)。 */
   .lrc-w { color: #7f8794; }
   .lrc-line.active .lrc-w {
     --fill: 0%;
@@ -1195,13 +1202,16 @@
       }
       if (!lrcUserScrolling) lrcScrollActive(true); // 手动滑动期间不抢滚动,停手后再回中
     }
-    // 逐字渐变填色(只处理当前行):每个词按 (posMs-词始)/词长 算填充比例 0~100%,
-    // 平滑扫过。已过的词=100,未到=0,当前词=部分。用 --fill 驱动 CSS 渐变。
+    // 逐字渐变填色(只处理当前行):每个词按 (posMs-词始)/词长 算填充比例,平滑扫过。
+    // 故意不夹到 [0,1]——原来这里夹过,副作用是"还没轮到"和"刚好唱到这个词最前一刻"
+    // 变成同一个值 0,CSS 渐变的软过渡带因此在每个未唱到的词开头都露出一小截不该有的
+    // 高亮(英文按整词分词,这一小截接近首字母宽度,表现成"提前加载颜色")。不夹的原始
+    // 值可能是很负/很大的百分比,交给 CSS 渐变 stop 的单调钳制规则(见上面 .lrc-w 那条
+    // 注释)自然处理成整段纯色,不用在这里手动分支。
     const cur = idx >= 0 ? lrcLines[idx] : null;
     if (cur && cur.words) {
       for (const w of cur.words) {
-        let f = w.dur > 0 ? (posMs - w.t) / w.dur : (posMs >= w.t ? 1 : 0);
-        f = f < 0 ? 0 : f > 1 ? 1 : f;
+        const f = w.dur > 0 ? (posMs - w.t) / w.dur : (posMs >= w.t ? 1 : 0);
         const pct = Math.round(f * 100);
         if (pct !== w._f) { w._f = pct; w.el.style.setProperty('--fill', pct + '%'); }
       }
