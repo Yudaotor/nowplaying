@@ -801,7 +801,11 @@
       coverSource: s.coverSource || '', lyricsSource: s.lyricsSource || '',
       durationMs: s.durationMs || 0, progressMs: s.progressMs || 0, progressTs: (typeof s.progressTs === 'number' ? s.progressTs : null),
       rate: (s.rate == null ? null : s.rate), ageMs: (typeof s.ageMs === 'number' ? s.ageMs : null), fetchedAt: (typeof s.fetchedAt === 'number' ? s.fetchedAt : null),
-      relayFresh: !!s.relayFresh });
+      relayFresh: !!s.relayFresh,
+      // 写入这份快照时的墙钟时间——不是"这首歌几时收听完"(listenedAt,当时若还在播放、
+      // 尚未形成一条完成收听,这个字段本身就是空的),而是"这条本地缓存本身多久没更新了"。
+      // revertStale() 兜底展示旧缓存时靠它撑出真实的"距今多久",见那边注释。
+      persistedAt: Date.now() });
     if (live) saveLive({ title, artist, album: s.album || '', artwork: art, links: s.links || {}, accent: s.accent || '' });
   }
 
@@ -851,7 +855,15 @@
   async function revertStale() {
     if (!document.querySelector('.card').classList.contains('stale')) return;
     const p = loadPersisted();
-    if (p && p.title) await paint({ ...p, playing: false });
+    if (p && p.title) {
+      // 这份缓存如果是"当时正在播放、还没形成一条完成收听"时抓的(listenedAt 为空),直接
+      // 摆出来会命中 paint() 里"最近播放"那个不带具体时间的含糊文案(见 status-text 那行
+      // 判断),用户没法判断这份数据实际停留在多久之前、跟这次拉取失败是不是同一回事——
+      // 用 persistedAt(写入这份缓存时的墙钟时间)兜底出一个真实的"距今多久",复用既有的
+      // "上次播放 · X" 文案,不需要新增状态分支。
+      const listenedAt = p.listenedAt || (p.persistedAt ? Math.floor(p.persistedAt / 1000) : null);
+      await paint({ ...p, playing: false, listenedAt });
+    }
     setProgress(null); // 退回"上次播放"语义,不是当下真实进度,别继续顶着一条不会走的进度条
     document.querySelector('.card').classList.remove('stale');
   }
