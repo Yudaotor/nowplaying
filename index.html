@@ -85,13 +85,18 @@
       width: min(94vw, 900px);
       display: grid;
       grid-template-columns: 340px minmax(0, 1fr);
-      grid-template-areas: "np side" "meta meta";
+      /* "side" 在 np/ta 两行里重复同一个名字,意思是它横跨这两行(右栏一路打通,
+         跟原来只有一行"side"时视觉上是一样高)——ta(top-artists-wrap)单独占左栏
+         第二行,让它在宽屏视觉上仍然落在"左栏、播放链接行下方",跟 DOM 顺序(现在
+         .top-artists-wrap 已经挪到 .side 后面)无关。 */
+      grid-template-areas: "np side" "ta side" "meta meta";
       column-gap: 44px; row-gap: 6px;
       align-items: start;
       padding: 40px 44px 28px;
     }
     .card.two-col .np   { grid-area: np; }
     .card.two-col .side { grid-area: side; display: flex; flex-direction: column; min-width: 0; }
+    .card.two-col .top-artists-wrap { grid-area: ta; }
     .card.two-col .meta,
     .card.two-col .visitor-count { grid-area: meta; }
     .card.two-col .art-wrap { width: 240px; height: 240px; }
@@ -390,7 +395,15 @@
      采集器一天推一次的 Last.fm 全时段(overall)播放榜(见 collector/topartists.go),不
      需要实时,不挂 60s 刷新节奏、只在页面加载时拉一次(见 initTopArtists)。跟
      .history-wrap/.comments-wrap 同一套"细线分隔+小标题"外观,视觉上是同一族的只读小
-     面板,只是现在挂在左栏而不是右栏。 ---- */
+     面板,只是现在挂在左栏而不是右栏。
+     2026-07-16:用户反馈手机端(不铺两栏、纯块状堆叠)这块内容显示在留言区上方,预期是
+     页面最底部——根源是 DOM 顺序:这个元素当时被挪进了 .np 内部、在 .side(留言墙所在)
+     之前,窄屏没有 grid 时就按 DOM 顺序堆叠,自然排到留言区上面。改成 HTML 里挪到
+     .side 后面(整个 .card 的最后一个内容块,紧挨底部的 Apple Music 归属文字之前)——
+     窄屏纯块状堆叠时就会顺理成章排到最后。宽屏(≥820px)则靠下面 .card.two-col 里新增
+     的 grid-area: ta 规则,在网格布局里精确摆回"左栏、播放链接行下方"这个原来的视觉
+     位置,不受 DOM 顺序影响——这正是用 CSS Grid 命名区域的意义:视觉位置和 DOM 顺序
+     解耦,不需要 JS 在两种布局之间搬 DOM 节点。 ---- */
   .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .top-artists-wrap.hidden { display: none; }
   .top-artists-title { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6b7280; margin-bottom: 10px; }
@@ -574,10 +587,6 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
     </a>
   </div>
-  <div id="top-artists-wrap" class="top-artists-wrap hidden">
-    <div class="top-artists-title">历史播放 Top10 歌手</div>
-    <div id="top-artists" class="top-artists"></div>
-  </div>
   </div><!-- /.np -->
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
@@ -606,6 +615,10 @@
     </form>
   </div>
   </div><!-- /.side -->
+  <div id="top-artists-wrap" class="top-artists-wrap hidden">
+    <div class="top-artists-title">历史播放 Top10 歌手</div>
+    <div id="top-artists" class="top-artists"></div>
+  </div>
   <div id="footer-meta" class="meta">Apple Music</div>
   <div id="visitor-count" class="visitor-count hidden" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
 </main>
@@ -1233,8 +1246,8 @@
   // 从不加 hidden,所以这个 || 分支目前恒为真——写成 classList 判断而不是直接 || true,
   // 是为了以后如果给留言墙也加"空内容时隐藏"之类的逻辑,这里不用跟着改。
   function updateLayout() {
-    // top-artists-wrap 现在挂在 .np(左侧播放区)里,不算"侧栏内容",不参与这个判断——
-    // 见 initTopArtists 那次挪位置的记录。
+    // top-artists-wrap 现在是 .np/.side 的同级兄弟节点(2026-07-16 挪的,见它旁边 CSS
+    // 注释),不属于 .side 内部,依然不参与这个判断——是否铺两栏只看歌词/历史/留言墙。
     const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden')
       || !el('comments-wrap').classList.contains('hidden');
     document.querySelector('.card').classList.toggle('two-col', hasSide);
