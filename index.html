@@ -88,8 +88,13 @@
       /* "side" 在 np/ta 两行里重复同一个名字,意思是它横跨这两行(右栏一路打通,
          跟原来只有一行"side"时视觉上是一样高)——ta(top-artists-wrap)单独占左栏
          第二行,让它在宽屏视觉上仍然落在"左栏、播放链接行下方",跟 DOM 顺序(现在
-         .top-artists-wrap 已经挪到 .side 后面)无关。 */
-      grid-template-areas: "np side" "ta side" "meta meta";
+         .top-artists-wrap 已经挪到 .side 后面)无关。react(reactions-footer)/meta
+         各自单独占一整行、横跨两栏,让表情反应真的落在页面最下面、跟访问次数挨在
+         一起,不用去纠结"多个元素共用同一个 grid-area 到底会不会互相压住"这种细节——
+         每个命名区域都只对应一个真正的元素(reactions-footer 这一整行只有它自己,
+         meta 那行虽然是 .meta+.visitor-count 两个元素共用,但那是改这次之前就有的
+         写法,两者本来就是纵向堆叠的短文字,没出过问题,不用跟着换)。 */
+      grid-template-areas: "np side" "ta side" "react react" "meta meta";
       column-gap: 44px; row-gap: 6px;
       align-items: start;
       padding: 40px 44px 28px;
@@ -97,6 +102,7 @@
     .card.two-col .np   { grid-area: np; }
     .card.two-col .side { grid-area: side; display: flex; flex-direction: column; min-width: 0; }
     .card.two-col .top-artists-wrap { grid-area: ta; }
+    .card.two-col .reactions-footer { grid-area: react; }
     .card.two-col .meta,
     .card.two-col .visitor-count { grid-area: meta; }
     .card.two-col .art-wrap { width: 240px; height: 240px; }
@@ -338,16 +344,21 @@
   }
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .preview-btn.playing { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
-  /* ---- 表情反应(2026-07-12新增):全站统一一份计数,跟哪首歌没关系(最初设计成按歌曲
-     分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。挂在 .comments-wrap 里、"留言"
-     标题正上方(用户反馈这个跟留言一样是"评论区"性质的东西,当天从 .np 挪过来的),跟
-     留言墙共用 60s 刷新节奏,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做
-     按钮级防抖。左对齐跟下面的"留言"标题/列表对齐,不再居中(居中是挂在封面下面时的
-     版式,挪进左对齐的评论区后改回左对齐更协调)。 ---- */
-  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; margin: 0 0 6px; }
+  /* ---- 表情反应(2026-07-12新增,几经改版):全站统一一份计数,跟哪首歌没关系(最初
+     设计成按歌曲分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。最早挂在
+     .comments-wrap 里、"留言"标题正上方;2026-07-16 精简成只剩 1 个赞之后,用户反馈
+     "既然只有一个的话，可以和统计次数那个放在一起，都在页面最底下"——现在跟
+     #footer-meta/#visitor-count 一样是 .card 的直接子节点、挂在最后,包一层
+     .reactions-footer 方便宽屏 grid 布局整体当一个区块摆放(不用纠结多个元素共用
+     同一个 grid-area 到底会不会互相压住,见下面 @media 里的注释)。跟留言墙共用 60s
+     刷新节奏,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。
+     居中对齐,跟 #footer-meta/#visitor-count 那种页脚小字的版式一致(不再是挂在左对齐
+     评论区里那版的左对齐)。 ---- */
+  .reactions-footer { margin-top: 22px; }
+  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 0 0 6px; }
   /* 2026-07-16:表情从 6 个精简成 1 个赞之后,单独一个胶囊按钮容易让人看不懂是干嘛的,
      加一行小字提示——字号/颜色跟 .comments-empty 那类"页面里的次要说明文字"同一套。 */
-  .reactions-hint { font-size: 11px; color: #6b7280; margin: 0 0 14px; }
+  .reactions-hint { font-size: 11px; color: #6b7280; margin: 0; }
   .reaction-btn {
     display: inline-flex; align-items: center; gap: 5px;
     height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
@@ -495,11 +506,13 @@
   :root[data-immersive] .history-wrap,
   :root[data-immersive] .comments-wrap,
   :root[data-immersive] .top-artists-wrap,
+  :root[data-immersive] .reactions-footer,
   :root[data-immersive] .meta,
   :root[data-immersive] .visitor-count,
   :root[data-immersive] .album { display: none; }
-  /* .reactions 现在挂在 .comments-wrap 里面(见上面 CSS 注释),父级隐藏子级自然跟着
-     隐藏,不用再单独列一条选择器。 */
+  /* 2026-07-16:.reactions 挪出 .comments-wrap、变成 .reactions-footer 包一层的独立
+     区块之后,不再是"父级隐藏子级自然跟着隐藏"了——这里补上一条选择器,不然沉浸模式下
+     这个赞的按钮会漏网,变成沉浸模式里唯一还留着的交互控件。 */
   :root[data-immersive] .art-wrap { width: min(40vh, 360px); height: min(40vh, 360px); }
   :root[data-immersive] h1 { font-size: clamp(24px, 3.4vw, 40px); }
   :root[data-immersive] .artist { font-size: clamp(15px, 1.8vw, 22px); }
@@ -522,8 +535,8 @@
     .artist { font-size: 15px; }
     .progress { margin-top: 16px; }
     .links { margin-top: 16px; gap: 12px; }
-    .reactions { gap: 8px; margin-bottom: 4px; }
-    .reactions-hint { margin-bottom: 12px; }
+    .reactions-footer { margin-top: 16px; }
+    .reactions { gap: 8px; }
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
     .history-wrap { margin-top: 16px; padding-top: 14px; }
@@ -610,8 +623,6 @@
     <div id="history" class="history"></div>
   </div>
   <div id="comments-wrap" class="comments-wrap">
-    <div id="reactions" class="reactions"></div>
-    <div class="reactions-hint">觉得有趣可以点个赞哦</div>
     <div class="comments-title">留言</div>
     <div id="comments" class="comments"></div>
     <form id="comment-form" class="comment-form">
@@ -624,6 +635,10 @@
   <div id="top-artists-wrap" class="top-artists-wrap hidden">
     <div class="top-artists-title">历史播放 Top10 歌手</div>
     <div id="top-artists" class="top-artists"></div>
+  </div>
+  <div class="reactions-footer">
+    <div id="reactions" class="reactions"></div>
+    <div class="reactions-hint">觉得有趣可以点个赞哦</div>
   </div>
   <div id="footer-meta" class="meta">Apple Music</div>
   <div id="visitor-count" class="visitor-count hidden" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
