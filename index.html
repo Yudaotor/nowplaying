@@ -344,7 +344,10 @@
      留言墙共用 60s 刷新节奏,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做
      按钮级防抖。左对齐跟下面的"留言"标题/列表对齐,不再居中(居中是挂在封面下面时的
      版式,挪进左对齐的评论区后改回左对齐更协调)。 ---- */
-  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; margin: 0 0 14px; }
+  .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; margin: 0 0 6px; }
+  /* 2026-07-16:表情从 6 个精简成 1 个赞之后,单独一个胶囊按钮容易让人看不懂是干嘛的,
+     加一行小字提示——字号/颜色跟 .comments-empty 那类"页面里的次要说明文字"同一套。 */
+  .reactions-hint { font-size: 11px; color: #6b7280; margin: 0 0 14px; }
   .reaction-btn {
     display: inline-flex; align-items: center; gap: 5px;
     height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
@@ -468,6 +471,7 @@
   :root[data-theme="light"] .comments-wrap { border-top-color: rgba(0,0,0,.1); }
   :root[data-theme="light"] .comments-title,
   :root[data-theme="light"] .comments-empty,
+  :root[data-theme="light"] .reactions-hint,
   :root[data-theme="light"] .c-time,
   :root[data-theme="light"] .visitor-count { color: #7a828f; }
   :root[data-theme="light"] .c-name,
@@ -518,7 +522,8 @@
     .artist { font-size: 15px; }
     .progress { margin-top: 16px; }
     .links { margin-top: 16px; gap: 12px; }
-    .reactions { gap: 8px; margin-bottom: 12px; }
+    .reactions { gap: 8px; margin-bottom: 4px; }
+    .reactions-hint { margin-bottom: 12px; }
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
     .history-wrap { margin-top: 16px; padding-top: 14px; }
@@ -606,6 +611,7 @@
   </div>
   <div id="comments-wrap" class="comments-wrap">
     <div id="reactions" class="reactions"></div>
+    <div class="reactions-hint">觉得有趣可以点个赞哦</div>
     <div class="comments-title">留言</div>
     <div id="comments" class="comments"></div>
     <form id="comment-form" class="comment-form">
@@ -1624,7 +1630,11 @@
   // 刷新节奏(见 bootstrap 的 window.__fetchComments 那行,一并调用)。真正防刷在后端,
   // 这里的按钮禁用只是防误触双击。
   (function initReactions() {
-    const REACTION_EMOJI = ['❤️', '🔥', '👍', '🎉', '😮', '😢'];
+    // 2026-07-16:用户反馈"不需要这样吧"——六个表情选项太多余,只留一个赞就够,选 ❤️
+    // 是因为它已经攒了真实点击数据(改之前線上就是排最前、已经有人点过的那个),换掉会
+    // 白丢这份数据。REACTION_EMOJI 保留数组形态(虽然现在只有一个元素)是刻意的——下面
+    // 建按钮/计数的循环逻辑不用跟着改,以后万一想恢复多个表情,加回数组元素就行。
+    const REACTION_EMOJI = ['❤️'];
     const wrap = el('reactions');
     if (!wrap || !RELAY) return;
     const btns = {};
