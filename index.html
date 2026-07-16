@@ -636,7 +636,7 @@
     <div class="top-artists-title">历史播放 Top10 歌手</div>
     <div id="top-artists" class="top-artists"></div>
   </div>
-  <div class="reactions-footer">
+  <div class="reactions-footer" id="reactions-footer">
     <div id="reactions" class="reactions"></div>
     <div class="reactions-hint">觉得有趣可以点个赞哦</div>
   </div>
@@ -730,6 +730,40 @@
   const LIVE_KEY = 'np:lastLive';
   function saveLive(s) { try { localStorage.setItem(LIVE_KEY, JSON.stringify({ ...s, seenAt: Date.now() })); } catch (e) {} }
   function loadLive() { try { return JSON.parse(localStorage.getItem(LIVE_KEY) || 'null'); } catch (e) { return null; } }
+
+  // 可选内容模块开关(2026-07-16新增):站长可在后端配置关掉历史/留言/表情/访客计数/
+  // Top10歌手 五个模块中的任意几个,配置随 GET {RELAY}/now 的 modules 字段下发(见
+  // fetchState()/tick())。先用 localStorage 缓存的上一份配置铺一次(首屏不用空等真实
+  // 网络响应),等 tick() 拿到新配置再刷新一遍——跟 np:last/np:lastHistory 同一套
+  // persist/load 写法。缺失的键(字段还没上线/单个键没写)一律按启用处理,只有显式 false
+  // 才算禁用,新模块/后端还没跟上时不会误伤现有站点。
+  const MODULES_KEY = 'np:modules';
+  function persistModules(cfg) { try { localStorage.setItem(MODULES_KEY, JSON.stringify(cfg)); } catch (e) {} }
+  function loadPersistedModules() { try { return JSON.parse(localStorage.getItem(MODULES_KEY) || 'null'); } catch (e) { return null; } }
+  function normalizeModules(raw) {
+    const enabled = key => !raw || raw[key] !== false;
+    return {
+      history: enabled('history'), comments: enabled('comments'), reactions: enabled('reactions'),
+      visitorCount: enabled('visitorCount'), topArtists: enabled('topArtists'),
+    };
+  }
+  let moduleConfig = normalizeModules(loadPersistedModules());
+  // 禁用的模块强制隐藏(.hidden);启用的模块这里绝不主动摘掉 hidden——那是各模块自己
+  // 内容驱动逻辑的地盘(比如 renderHistory 空列表时自己隐藏、initTopArtists/
+  // initVisitorCounter 只在异步拿到非空结果后才显示),这里跟它们抢摘 hidden 会把"真的
+  // 没内容"的模块强行摆出来,详见文件顶部这次改动的设计说明。
+  function applyModuleVisibility() {
+    const wrapIds = {
+      history: 'history-wrap', comments: 'comments-wrap', topArtists: 'top-artists-wrap',
+      reactions: 'reactions-footer', visitorCount: 'visitor-count',
+    };
+    for (const key in wrapIds) {
+      const elm = el(wrapIds[key]);
+      if (elm && !moduleConfig[key]) elm.classList.add('hidden');
+    }
+    updateLayout();
+  }
+  applyModuleVisibility();
 
   let curKey = '';
   let lastAppliedArt = ''; // 当前实际显示在 #art 上的封面 URL,见 paint() 里换歌封面纠正逻辑
@@ -941,6 +975,7 @@
   // 最近播放历史条:LB 已完成的 listen(现含 iPhone),去重取带封面的前几首,
   // 缩略图可点(跳该歌的 Apple/网易云)。每 30s 刷一次。
   async function fetchHistory() {
+    if (!moduleConfig.history) { el('history-wrap').classList.add('hidden'); updateLayout(); return; }
     if (USER === 'CHANGE_ME') return;
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
@@ -1093,6 +1128,7 @@
   };
   function renderHistory(items) {
     const box = el('history'), wrap = el('history-wrap');
+    if (!moduleConfig.history) { wrap.classList.add('hidden'); historySig = ''; updateLayout(); return; }
     if (!items.length) { wrap.classList.add('hidden'); historySig = ''; updateLayout(); return; }
     // 内容没变就整体跳过——否则每 60s / 每次切回标签都会清零用户滚动位置 + 白重建几百个 DOM。
     const sig = items.map(it => `${it.title}|${it.artist}|${it.url || ''}|${it.device || ''}`).join('\n');
@@ -1398,9 +1434,9 @@
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
             // 服务器算的锚点年龄 + 本设备收到的时刻:据此外推不依赖本设备绝对时钟(消除跨设备时钟偏差)。
             ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(), relayFresh: d.source === 'kv',
-            links: d.links || {} };
+            links: d.links || {}, modules: d.modules };
         }
-        if (d && d.empty) return { empty: true };
+        if (d && d.empty) return { empty: true, modules: d.modules };
       } catch (e) { /* 中继不通 → 落到下面 LB 兜底 */ }
     }
     try {
@@ -1439,6 +1475,13 @@
   async function tick() {
     if (USER === 'CHANGE_ME') { paintIdle('页面未配置：URL 需带 ?user=<ListenBrainz用户名>'); return; }
     const s = await fetchState();
+    // 拿到真实响应(哪怕是 empty)才刷新模块开关——总请求失败(s===null)保留上一份已知
+    // 有效的配置不动,不能因为一次瞬时失败就把模块打回默认全开。
+    if (s) {
+      moduleConfig = normalizeModules(s.modules);
+      persistModules(moduleConfig);
+      applyModuleVisibility();
+    }
     // 空闲态兜底只在"纯历史的上次播放"(current!==true,如 LB fallback 给的旧记录)时才
     // 跟本地缓存比新旧——current===true 代表 Mac/iPhone 此刻活跃的曲目(哪怕暂停),是当下
     // 真相,必须直接显示,不能因为它没有 listenedAt(暂停曲目没有"收听于何时"这回事,语义上
@@ -1625,7 +1668,7 @@
   // 无痕模式会被重新计入,是用户自己要求的方案,接受这个已知代价。
   (function initVisitorCounter() {
     const elm = el('visitor-count');
-    if (!elm || !RELAY) return;
+    if (!elm || !RELAY || !moduleConfig.visitorCount) return;
     const KEY = 'np:visited';
     (async () => {
       try {
@@ -1651,7 +1694,7 @@
     // 建按钮/计数的循环逻辑不用跟着改,以后万一想恢复多个表情,加回数组元素就行。
     const REACTION_EMOJI = ['❤️'];
     const wrap = el('reactions');
-    if (!wrap || !RELAY) return;
+    if (!wrap || !RELAY || !moduleConfig.reactions) return;
     const btns = {};
     for (const emo of REACTION_EMOJI) {
       const b = document.createElement('button');
@@ -1692,7 +1735,7 @@
   (function initComments() {
     const wrap = el('comments-wrap'), box = el('comments'), form = el('comment-form'),
           nameInput = el('comment-name'), textInput = el('comment-text'), submitBtn = el('comment-submit');
-    if (!wrap || !box || !form || !RELAY) return;
+    if (!wrap || !box || !form || !RELAY || !moduleConfig.comments) return;
     let sig = '';
     function render(items) {
       const s = items.map(c => `${c.id}|${c.name}|${c.text}`).join('\n');
@@ -1746,7 +1789,7 @@
   // 圆形首字母占位。
   (function initTopArtists() {
     const wrap = el('top-artists-wrap'), box = el('top-artists');
-    if (!wrap || !box || !RELAY) return;
+    if (!wrap || !box || !RELAY || !moduleConfig.topArtists) return;
     function fallbackAvatar(name) {
       const d = document.createElement('div');
       d.className = 'ta-avatar-fallback';
@@ -1807,14 +1850,14 @@
   setInterval(() => { if (!document.hidden) tick(); }, POLL_MS);
   setInterval(() => { if (!document.hidden) {
     fetchHistory();
-    if (window.__fetchComments) window.__fetchComments();
-    if (window.__fetchReactions) window.__fetchReactions();
+    if (moduleConfig.comments && window.__fetchComments) window.__fetchComments();
+    if (moduleConfig.reactions && window.__fetchReactions) window.__fetchReactions();
   } }, 60000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       tick(); fetchHistory();
-      if (window.__fetchComments) window.__fetchComments();
-      if (window.__fetchReactions) window.__fetchReactions();
+      if (moduleConfig.comments && window.__fetchComments) window.__fetchComments();
+      if (moduleConfig.reactions && window.__fetchReactions) window.__fetchReactions();
     }
   });
 
