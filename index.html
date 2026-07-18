@@ -655,6 +655,24 @@
 
   const el = id => document.getElementById(id);
 
+  // iTunes 搜索完全没做专辑/版本区分,直接信排序第一条——查询曲名带"live"/"现场"/
+  // "演唱会"这类标记时(演唱会/现场版常见写法),第一条结果反而常是同名歌曲的录音室版
+  // (iTunes 排序对结构复杂的标题,比如把好几首歌名拼在一起的现场串烧"Medley: A/B/C/D
+  // (Live)",经常连关键词都对不完整、只能命中其中一首歌,选出的是这首歌全网最热门的
+  // 版本——录音室版通常比某场具体演唱会的现场版更热门,反而排到前面)。这里在候选里
+  // 找一个至少标了"live"的,起码比塞一张完全不同年代的录音室专辑封面更贴题(实测坐实:
+  // 周杰伦"Medley: 星晴/回到过去/最后的战役/爱我别走 (Live)",原本 limit=1 只能拿到
+  // 第一条《八度空间》2002 录音室版《最后的战役》封面,多要几条、里面其实有 Live 版本)。
+  // artworkFor/previewFor 共用这份挑选逻辑,不各自维护一份——避免两处以后各自改出分歧。
+  function pickITunesResult(results, title) {
+    if (!results || !results.length) return null;
+    if (/live|现场|演唱会/i.test(title)) {
+      const live = results.find(r => /live|现场|演唱会/i.test(`${r.trackName} ${r.collectionName}`));
+      if (live) return live;
+    }
+    return results[0];
+  }
+
   const artCache = new Map();
   async function artworkFor(artist, title) {
     const key = `art:${artist}|${title}`;
@@ -665,9 +683,10 @@
     } catch (e) {}
     try {
       const q = encodeURIComponent(`${artist} ${title}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`);
       const data = await res.json();
-      const url100 = data.results && data.results[0] && data.results[0].artworkUrl100;
+      const result = pickITunesResult(data.results, title);
+      const url100 = result && result.artworkUrl100;
       const url = url100 ? url100.replace('100x100bb', '600x600bb') : '';
       artCache.set(key, url);
       try { if (url) localStorage.setItem(key, url); } catch (e) {}
@@ -684,9 +703,10 @@
     try { const c = localStorage.getItem(key); if (c !== null) { previewCache.set(key, c); return c; } } catch (e) {}
     try {
       const q = encodeURIComponent(`${artist} ${title}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`);
       const data = await res.json();
-      const url = (data.results && data.results[0] && data.results[0].previewUrl) || '';
+      const result = pickITunesResult(data.results, title);
+      const url = (result && result.previewUrl) || '';
       previewCache.set(key, url);
       try { if (url) localStorage.setItem(key, url); } catch (e) {}
       return url;
