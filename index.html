@@ -217,19 +217,37 @@
     transition: background .8s ease;
   }
   /* 播放头呼吸光晕:骑在 bar-fill 右边缘(即当前播放位置),播放时呼吸,暂停立即收起——
-     一眼就能看出是否在播放。是 bar-fill 的伪元素,天然跟着 width% 走,不用额外 JS 定位。 */
-  .bar-fill::after {
+     一眼就能看出是否在播放。是 bar-fill 的伪元素,天然跟着 width% 走,不用额外 JS 定位。
+     用户反馈原来的光晕(45%→0%、扩到 6px)太不明显——加大峰值不透明度和扩散半径,
+     加一圈更外层的第二道光晕(::before,同一个元素动画错开半拍)做出"一圈追着一圈"
+     的环绕脉冲感,球本身也跟着轻微放大,而不只是单独一圈淡出的阴影。 */
+  .bar-fill::after, .bar-fill::before {
     content: ''; position: absolute; right: -1px; top: 50%; width: 9px; height: 9px;
-    border-radius: 50%; background: var(--accent, #f5f6f8); transform: translate(50%, -50%);
-    opacity: 0; transition: opacity .25s ease;
+    border-radius: 50%; transform: translate(50%, -50%);
+    opacity: 0; transition: opacity .25s ease; pointer-events: none;
   }
-  .progress.is-live .bar-fill::after { opacity: 1; animation: bar-head-glow 1.8s ease-in-out infinite; }
+  .bar-fill::after { background: var(--accent, #f5f6f8); }
+  .progress.is-live .bar-fill::after {
+    opacity: 1; animation: bar-head-glow 1.6s ease-in-out infinite;
+  }
+  .progress.is-live .bar-fill::before {
+    opacity: 1; animation: bar-head-glow 1.6s ease-in-out infinite;
+    animation-delay: .55s;
+  }
   @keyframes bar-head-glow {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #f5f6f8) 45%, transparent); }
-    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent); }
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #f5f6f8) 70%, transparent);
+           transform: translate(50%, -50%) scale(1); }
+    70%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent);
+           transform: translate(50%, -50%) scale(1.2); }
+    100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent);
+           transform: translate(50%, -50%) scale(1); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .progress.is-live .bar-fill::after { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #f5f6f8) 30%, transparent); }
+    .progress.is-live .bar-fill::before { animation: none; opacity: 0; }
+    .progress.is-live .bar-fill::after {
+      animation: none;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #f5f6f8) 35%, transparent);
+    }
   }
   .times {
     display: flex; justify-content: space-between; margin-top: 8px;
