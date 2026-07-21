@@ -1,23 +1,21 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- 预热连接:提前和自建中继(主数据源)/网易云图床握手,省首屏 /now 的 TLS 往返;LB 已降级为兜底,仅 dns-prefetch。 -->
-<link rel="preconnect" href="https://np.yudaotor.me" crossorigin>
+<!-- 这是给 fork 的人用的通用模板:没有绑定任何个人的中继/CDN,所以这里不预连接具体域名——
+     只对"任何部署都用得到"的 ListenBrainz API 和网易云图床做 dns-prefetch。你自己部署了
+     state-worker 之后,可以照 web/index.html 的写法加一行 preconnect 到你自己的 relay 域名。 -->
 <link rel="dns-prefetch" href="https://api.listenbrainz.org">
 <link rel="dns-prefetch" href="https://p1.music.126.net">
 <link rel="dns-prefetch" href="https://p2.music.126.net">
 <link rel="dns-prefetch" href="https://p3.music.126.net">
-<title data-i18n="docTitleIdle">正在听什么 ♪</title>
-<!-- 社交解链:粘 github.io 链接显示动态封面(/cover)+通用标题;要完整动态标题用 np.yudaotor.me/share -->
+<title data-i18n="docTitleIdle">Now Playing ♪</title>
+<!-- 社交卡片预览(og:image/og:url/twitter:image)故意没填——那需要一个能吐出当前封面图的
+     端点(比如 state-worker 的 /cover),你自己部署好之后照 web/index.html 的写法加回来即可。 -->
 <meta property="og:type" content="music.song">
-<meta property="og:title" content="正在听什么 ♪">
-<meta property="og:description" content="看看我此刻在听的歌 · Apple Music">
-<meta property="og:image" content="https://np.yudaotor.me/cover">
-<meta property="og:url" content="https://yudaotor.github.io/nowplaying/">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://np.yudaotor.me/cover">
+<meta property="og:title" content="Now Playing ♪">
+<meta property="og:description" content="See what I'm listening to right now · Apple Music">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <style>
   :root { color-scheme: dark; }
@@ -668,9 +666,12 @@
   const USER = params.get('user') || 'CHANGE_ME';
   const LB = 'https://api.listenbrainz.org';
   const POLL_MS = 10000; // 进度/歌词客户端外推,轮询只为换歌/暂停等状态,放宽到 10s 省 KV 读额度
-  // 主数据源:自建状态中继(Cloudflare Worker+KV,采集器直推,国内可达且不受 LB 抽风影响)。
-  // 读 /now(当前)+ /history(历史)。可 ?relay= 覆盖;设 ?relay=off 则退回直连 LB。
-  const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || 'https://np.yudaotor.me'; })();
+  // 这是模板/demo,默认不绑定任何人的 relay——RELAY 默认空,直接走下面 fetchState() 里
+  // 直连 ListenBrainz 的兜底路径(只需要一个 ?user=<ListenBrainz用户名>,零部署成本就能跑
+  // 起来)。想要 /now、/history、留言墙、表情反应、访客计数、Top10 歌手这些完整功能,
+  // 照 ../../docs/web-features.md 把 state-worker/badge-worker 部署到你自己的 Cloudflare
+  // 账号下,再用 ?relay=https://your-worker.workers.dev 指过去(或者改这里的默认值)。
+  const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || ''; })();
 
   const el = id => document.getElementById(id);
 
@@ -2069,10 +2070,9 @@
     }
   });
 
-  // Service Worker：缓存页面壳，重复访问秒开（不阻塞首屏）。
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  // 这份 demo 是纯单文件模板(见 README),故意不带 sw.js 那份 Service Worker 缓存优化——
+  // 那是维护者自己部署("../index.html")的性能优化,不是功能所需,加进来就得多维护/多同步
+  // 一个文件,对模板来说得不偿失。
 })();
 </script>
 </body>
