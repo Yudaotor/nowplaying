@@ -9,6 +9,7 @@
 ![Single file](https://img.shields.io/badge/single%20file-no%20build%20step-success)
 ![Bilingual](https://img.shields.io/badge/UI-English%20%2F%20%E4%B8%AD%E6%96%87-blue)
 ![GitHub Pages](https://img.shields.io/badge/hosted%20on-GitHub%20Pages-222)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 [**Live demo →**](https://yudaotor.github.io/nowplaying/?user=yudaotor)
 

@@ -9,6 +9,7 @@
 ![Single file](https://img.shields.io/badge/%E5%8D%95%E6%96%87%E4%BB%B6-%E6%97%A0%E6%9E%84%E5%BB%BA%E6%AD%A5%E9%AA%A4-success)
 ![Bilingual](https://img.shields.io/badge/%E7%95%8C%E9%9D%A2-%E4%B8%AD%E6%96%87%20%2F%20English-blue)
 ![GitHub Pages](https://img.shields.io/badge/%E6%89%98%E7%AE%A1%E5%9C%A8-GitHub%20Pages-222)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 [**在线演示 →**](https://yudaotor.github.io/nowplaying/?user=yudaotor)
 
