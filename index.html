@@ -1960,9 +1960,9 @@
   // (overall)播放榜(见 collector/topartists.go 的 topArtistsDigest),用户明确要求
   // "不用实时更新,每天更新一次就好"——所以故意只在页面加载时拉一次,不挂进下面
   // fetchHistory/fetchComments/fetchReactions 共用的 60s 刷新节奏:那样做只会每分钟
-  // 白打一次 KV 读请求换回同一份数据(采集器一天才写一次),纯粹浪费。头像来自 Deezer
-  // (Last.fm 自己的 artist.getinfo 已确认对所有歌手只返回同一张占位图,查不到真实头像),
-  // 单张头像加载失败(Deezer 图床偶尔挂/歌手改名搜不到)不影响其它 9 个,各自独立兜底成
+  // 白打一次 KV 读请求换回同一份数据(采集器一天才写一次),纯粹浪费。头像由采集器解析:
+  // QQ 音乐优先、Deezer 兜底(Last.fm 自己的 artist.getinfo 已确认对所有歌手只返回同一张
+  // 占位图,查不到真实头像),单张头像加载失败不影响其它 9 个,各自独立兜底成
   // 圆形首字母占位。
   (function initTopArtists() {
     const wrap = el('top-artists-wrap'), box = el('top-artists');

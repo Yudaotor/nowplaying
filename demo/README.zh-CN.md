@@ -26,13 +26,20 @@
 首次打开会读 `navigator.language` 自动判断语言(判断不出来时兜底英文)，之后随时可以点
 工具栏里的 🌐 按钮手动切换。选择存在 `localStorage` 里，刷新/下次打开都会记住。
 
-## 进阶功能(暂未包含)
+## 进阶功能(可选中继)
 
 维护者自己那份页面(`../index.html`)还额外支持留言墙、表情反应、访客计数、"历史播放
 Top10 歌手"面板，以及延迟更低的实时播放状态——这些都靠一个小的 Cloudflare Worker 中继
-(`?relay=` 参数)撑着，这部分源码目前还没公开。这个中继计划在配套的 macOS App 开源的
-同时一并开源；在那之前，本模板按上面说的直连 ListenBrainz 模式就能跑得很好，只是没有
-这些附加功能。
+(`?relay=` 参数)撑着。中继已经开源在
+[Yudaotor/nowplaying-workers](https://github.com/Yudaotor/nowplaying-workers/blob/main/README.zh-CN.md)，
+它的 README 就是一份完整的从零部署教程(Cloudflare 免费额度完全够用)。部署好之后，
+访问时带 `?relay=https://your-worker.workers.dev` 指过去，或者改 `<script>` 块开头
+附近的 `RELAY` 常量把它设成默认值。
+
+一个如实的提醒:往中继推送*实时*状态(秒级换歌、播放进度、解析好的歌词/封面)的那个
+配套 macOS App 还没开源。没有它，中继依然能带来留言墙、点赞、访客计数(这三个完全由
+访客驱动)，还能在服务端代理 ListenBrainz——但"正在播放"的数据细节就停留在 ListenBrainz
+本身的水平，等 App 发布后才能补齐。
 
 ## 自定义
 

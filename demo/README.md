@@ -31,14 +31,23 @@ Language is auto-detected from `navigator.language` on first visit (falls back t
 English) and can be switched manually at any time via the 🌐 button in the toolbar.
 The choice is saved in `localStorage` and persists across reloads.
 
-## Advanced features (not included yet)
+## Advanced features (optional relay)
 
 The maintainer's own page (`../index.html`) additionally supports a comment wall,
 emoji reactions, a visitor counter, a "top artists" panel, and lower-latency now-playing
-updates — all powered by a small Cloudflare Worker relay (`?relay=` parameter) whose
-source isn't published yet. That relay is planned to be open-sourced alongside the
-companion macOS app; until then, this template runs happily in direct-ListenBrainz mode
-as described above, just without those extras.
+updates — all powered by a small Cloudflare Worker relay (the `?relay=` parameter).
+The relay is open source at
+[Yudaotor/nowplaying-workers](https://github.com/Yudaotor/nowplaying-workers#readme),
+and its README is a complete from-scratch deployment walkthrough (the Cloudflare free
+tier is plenty). Once yours is up, point this page at it with
+`?relay=https://your-worker.workers.dev`, or make it the default by editing the `RELAY`
+constant near the top of the `<script>` block.
+
+One honest caveat: the companion macOS app whose collector pushes *live* state
+(instant track changes, playback progress, resolved lyrics/covers) isn't open-source
+yet. A relay without it still adds the guestbook, reactions, and visitor counter —
+those are driven entirely by your visitors — and proxies ListenBrainz server-side,
+but now-playing data stays at ListenBrainz-level detail until the app is released.
 
 ## Customizing
 
