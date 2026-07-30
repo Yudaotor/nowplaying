@@ -213,7 +213,7 @@
   .bar { position: relative; height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); }
   .bar-fill {
     position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-    border-radius: 999px; background: var(--accent, #f5f6f8);
+    border-radius: 999px; background: var(--accent-fg, #f5f6f8);
     transition: background .8s ease;
   }
   /* 播放头呼吸光晕:骑在 bar-fill 右边缘(即当前播放位置),播放时呼吸,暂停立即收起——
@@ -226,7 +226,7 @@
     border-radius: 50%; transform: translate(50%, -50%);
     opacity: 0; transition: opacity .25s ease; pointer-events: none;
   }
-  .bar-fill::after { background: var(--accent, #f5f6f8); }
+  .bar-fill::after { background: var(--accent-fg, #f5f6f8); }
   .progress.is-live .bar-fill::after {
     opacity: 1; animation: bar-head-glow 1.6s ease-in-out infinite;
   }
@@ -235,18 +235,18 @@
     animation-delay: .55s;
   }
   @keyframes bar-head-glow {
-    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #f5f6f8) 70%, transparent);
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-fg, #f5f6f8) 70%, transparent);
            transform: translate(50%, -50%) scale(1); }
-    70%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent);
+    70%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent-fg, #f5f6f8) 0%, transparent);
            transform: translate(50%, -50%) scale(1.2); }
-    100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent, #f5f6f8) 0%, transparent);
+    100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent-fg, #f5f6f8) 0%, transparent);
            transform: translate(50%, -50%) scale(1); }
   }
   @media (prefers-reduced-motion: reduce) {
     .progress.is-live .bar-fill::before { animation: none; opacity: 0; }
     .progress.is-live .bar-fill::after {
       animation: none;
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #f5f6f8) 35%, transparent);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-fg, #f5f6f8) 35%, transparent);
     }
   }
   .times {
@@ -272,7 +272,7 @@
   @media (prefers-reduced-motion: reduce) { .lrc-line.active { transform: none; } }
   .lrc-roma { font-size: 11px; line-height: 1.25; color: #838a97; margin-bottom: 1px; }
   .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
-  .lrc-line.active .lrc-main { color: var(--accent, #f2f4f7); } /* 行级高亮(无逐字时) */
+  .lrc-line.active .lrc-main { color: var(--accent-fg, #f2f4f7); } /* 行级高亮(无逐字时) */
   .lrc-tr { font-size: 12px; line-height: 1.25; color: #838a97; margin-top: 1px; font-weight: 400; }
   /* 逐字(yrc):每个词随时间从左到右"渐变扫过"填色,而不是整词硬切。--fill 由 syncLyrics
      每帧更新,渐变里留一段软过渡区(±9%),看起来是慢慢填满这个词。--fill 故意不夹到
@@ -287,14 +287,14 @@
   .lrc-line.active .lrc-w {
     --fill: 0%;
     background-image: linear-gradient(90deg,
-      var(--accent, #fff) 0, var(--accent, #fff) calc(var(--fill) - 9%),
+      var(--accent-fg, #fff) 0, var(--accent-fg, #fff) calc(var(--fill) - 9%),
       #99a0ad calc(var(--fill) + 9%), #99a0ad 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent; color: transparent;
   }
   @media (prefers-reduced-motion: reduce) {
     .lrc-line.active .lrc-w { background-image: none; -webkit-text-fill-color: currentColor; color: #aab0bc; }
-    .lrc-line.active .lrc-w.sung { color: var(--accent, #fff); }
+    .lrc-line.active .lrc-w.sung { color: var(--accent-fg, #fff); }
   }
   @media (prefers-reduced-motion: reduce) { .lyrics-inner { transition: none; } }
   .links {
@@ -484,7 +484,7 @@
   :root[data-theme="light"] .lrc-tr { color: #7a828f; }
   :root[data-theme="light"] .status { background: rgba(0,0,0,.06); color: #5a616e; }
   :root[data-theme="light"] .lrc-main { color: #5a616e; }
-  :root[data-theme="light"] .lrc-line.active .lrc-main { color: var(--accent, #1c1f26); }
+  :root[data-theme="light"] .lrc-line.active .lrc-main { color: var(--accent-fg, #1c1f26); }
   :root[data-theme="light"] .lrc-w { color: #9aa1ad; }
   :root[data-theme="light"] .bar { background: rgba(0,0,0,.12); }
   :root[data-theme="light"] .history .h-title { color: #2a2e37; }
@@ -1033,16 +1033,33 @@
     }
     return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
   }
+  // --accent 这个原始 hex 同时喂给两处性质完全不同的地方:大片、低对比度的氛围光晕
+  // (flow blob,下面 S/L 夹到 [48,85]/[46,62] 那一段,本来就该跟模糊封面融在一起)、
+  // 以及压在同一片模糊背景之上、必须让人一眼认出来的前景元素(进度条、歌词高亮)——
+  // 两者共用同一个值,遇到本身就偏暗/偏灰/偏浅的封面主色,前景元素跟它背后那片同色调
+  // 模糊背景亮度/饱和度靠得太近,糊在一起分不清(2026-07-30 用户实测反馈)。派生出单独
+  // 一个 --accent-fg 专供前景用:饱和度统一拉高保证"看得出这是个颜色",亮度按当前
+  // 主题往跟氛围光晕相反的方向夹(氛围底默认主题背景整体偏暗,前景推亮;浅色主题背景
+  // 整体偏白,前景推暗),跟背景天然拉开亮度差,而不是碰巧撞进同一个亮度区间。
+  function accentFgHsl(h, s, l) {
+    const isLight = document.documentElement.dataset.theme === 'light';
+    const S = Math.min(90, Math.max(60, s));
+    const L = isLight ? Math.min(44, Math.max(28, l)) : Math.min(80, Math.max(66, l));
+    return `hsl(${h} ${S}% ${L}%)`;
+  }
   // flow-a/flow-b 交替担任"当前显示"的色斑层;flowOn 记录哪一层现在亮着(0=a,1=b)。
-  // 同一个 hex 重复调用(同曲每次 poll 都会来一次)不重新触发交叉淡入淡出。
+  // 同一个 hex 重复调用(同曲每次 poll 都会来一次)不重新触发交叉淡入淡出——但
+  // --accent-fg 每次都要重算而不能跟着一起被这层去重跳过,不然切主题(浅色/氛围底)
+  // 那一刻明明没换歌、hex 没变,前景色也不会跟着换。
   let flowOn = 0, lastAccentHex = '';
   function setAccent(hex) {
     const root = document.documentElement;
     if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) {
       root.style.setProperty('--accent', hex);
+      const [h, s, l] = hexToHsl(hex);
+      root.style.setProperty('--accent-fg', accentFgHsl(h, s, l));
       if (hex === lastAccentHex) return;
       lastAccentHex = hex;
-      const [h, s, l] = hexToHsl(hex);
       const S = Math.min(85, Math.max(48, s)), L = Math.min(62, Math.max(46, l));
       const c1 = `hsl(${h} ${S}% ${L}%)`, c2 = `hsl(${(h + 38) % 360} ${S}% ${L}%)`, c3 = `hsl(${(h + 322) % 360} ${S}% ${L}%)`;
       const next = el(flowOn ? 'flow-a' : 'flow-b'), prev = el(flowOn ? 'flow-b' : 'flow-a');
@@ -1053,8 +1070,17 @@
     } else {
       lastAccentHex = '';
       root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-fg');
       el('flow-a').classList.remove('on'); el('flow-b').classList.remove('on');
     }
+  }
+  // 主题切换(氛围/浅色)本身不换歌、hex 不变,但 --accent-fg 该往哪边夹取决于主题——
+  // 切换那一刻必须重算一次,不然要等下一次 poll 换歌才会跟着变。initTheme 的 apply()
+  // 里调用这个。
+  function refreshAccentFg() {
+    if (!lastAccentHex) return;
+    const [h, s, l] = hexToHsl(lastAccentHex);
+    document.documentElement.style.setProperty('--accent-fg', accentFgHsl(h, s, l));
   }
 
   // 首屏显示的是本地缓存的上一首：置灰 + 状态显示“更新中…”，拉到实时数据后由 clear 恢复。
@@ -1790,6 +1816,9 @@
       if (theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', theme);
       btn.textContent = ICON[theme] || '🌗';
       btn.title = t('themeTitlePrefix') + t(LABEL_KEY[theme] || 'themeAuto') + t('themeTitleSuffix');
+      // 切主题不换歌,但 --accent-fg 该往哪边夹取决于主题(见 accentFgHsl 注释)——
+      // data-theme 属性改完之后立刻重算,不等下一次换歌才生效。
+      refreshAccentFg();
     };
     let cur = localStorage.getItem('np:theme');
     if (!THEMES.includes(cur)) cur = 'auto';
