@@ -26,7 +26,14 @@
     min-height: 100vh;
     min-height: 100dvh;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
-    background: #0d0f14;
+    /* 2026-07-30 起页面本身("卡片以外的一切")固定不变——一块带一点垂直渐变纵深感的
+       深炭黑,不管当前播放哪首歌都不变(用户反馈:原来卡片外面那圈模糊封面/流动色斑
+       会跟着专辑主色到处跳,想要卡片以外的区域始终是同一个有质感的黑,只有卡片本身
+       (含专辑封面/黑胶唱片外圈发光、进度条、歌词高亮)跟着歌变色——见 .card 的
+       background,那里改用 var(--accent) 直接染卡片自己的底色,不再需要卡片外面另起
+       一层跟着歌变色的模糊背景/色斑,干净利落地把"变"和"不变"的边界卡在卡片的圆角
+       矩形上,不留过渡区)。 */
+    background: radial-gradient(140% 120% at 50% 15%, #202226 0%, #121316 45%, #08090b 100%);
     color: #f5f6f8;
     display: grid;
     place-items: center;
@@ -35,49 +42,31 @@
     overflow-x: hidden;
     position: relative;
   }
-  #bg {
-    position: fixed; inset: -60px;
-    background-size: cover; background-position: center;
-    filter: blur(60px) saturate(1.6) brightness(0.45);
-    transition: background-image .8s ease;
-    z-index: 0;
+  /* 细颗粒噪点:纯 CSS(SVG feTurbulence data URI),给上面那块固定深色底加一点"质感",
+     不是死板的纯色渐变。透明度很低,只在近距离才看得出纹理,不会喧宾夺主。 */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    opacity: .05; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
-  /* 廉价"流动渐变":三团柔光色斑，在模糊封面之上缓慢漂移，营造流动彩雾(纯 CSS、不读
-     封面像素、几乎不耗电)。叠两层(.flow-a/.flow-b)交替担任"当前显示"：换歌时新主色画到
-     当前不可见的那层再淡入，旧层淡出——多层径向渐变本身不能被 transition 平滑插值(不像
-     纯色)，两层交叉淡入淡出才能避免色斑瞬间跳变。--fc1/2/3 是各层自己的局部变量，由
-     setAccent 分别设置，互不影响。 */
-  .flow {
-    position: fixed; inset: -25%; z-index: 0; pointer-events: none; opacity: 0;
-    background:
-      radial-gradient(42% 42% at 28% 30%, var(--fc1, #6a4bd0), transparent 70%),
-      radial-gradient(46% 46% at 72% 38%, var(--fc2, #c0507a), transparent 70%),
-      radial-gradient(52% 52% at 50% 76%, var(--fc3, #3f8fd0), transparent 72%);
-    filter: blur(64px) saturate(1.25);
-    animation: flow 34s ease-in-out infinite alternate;
-    will-change: transform, opacity;
-    transition: opacity .6s ease;
-  }
-  .flow.on { opacity: .5; }
-  @keyframes flow {
-    0%   { transform: translate(-4%, -3%) rotate(0deg) scale(1.06); }
-    50%  { transform: translate(3%, 4%) rotate(9deg) scale(1.16); }
-    100% { transform: translate(-2%, 3%) rotate(-6deg) scale(1.09); }
-  }
-  @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
   .card {
     position: relative; z-index: 1;
     width: min(92vw, 400px);
     display: flex; flex-direction: column;
     padding: 32px 26px 26px;
     border-radius: 28px;
-    background: rgba(22, 25, 33, .58);
+    /* 卡片自己的底色直接按当前歌的关键色染一层薄薄的颜色,混进原来那层半透明深色——
+       这是现在整个页面里唯一会跟着歌变色的背景(专辑封面/黑胶唱片外圈发光、进度条、
+       歌词高亮是另外三处,同样用 var(--accent)/var(--accent-fg),互不冲突)。没有
+       accent 时(没在放歌)color-mix 里的透明兜底让它退回纯原色,跟以前视觉一致。 */
+    background: color-mix(in srgb, var(--accent, transparent) 16%, rgba(22, 25, 33, .58));
     backdrop-filter: blur(30px) saturate(1.4);
     -webkit-backdrop-filter: blur(30px) saturate(1.4);
     border: 1px solid rgba(255,255,255,.08);
     box-shadow: 0 24px 80px rgba(0,0,0,.55);
     text-align: center;
-    transition: opacity .35s ease;
+    transition: opacity .35s ease, background .8s ease;
   }
   /* 宽屏(≥820px)且有侧栏内容(歌词/历史)时，横向铺成两栏：左=正在播放，右=歌词+历史。 */
   @media (min-width: 820px) {
@@ -170,7 +159,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .tool-btn:hover { background: rgba(255,255,255,.14); }
-  .tool-btn.on { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
+  .tool-btn.on { color: var(--accent-fg, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
   .tools-toggle { display: none; } /* 桌面端不用抽屉,见下方 max-width:600px 里的覆盖 */
   .tools-toggle span { display: inline-block; transition: transform .2s ease; }
   .tools-toggle.on span { transform: rotate(90deg); } /* "⋯" 转90°看起来像"⋮",暗示"已展开" */
@@ -328,7 +317,7 @@
     color: #6b7280; opacity: .8; user-select: none; }
   .h-divider::after { content: ''; flex: 1; height: 1px; background: currentColor; opacity: .3; }
   .h-divider:first-child { margin-top: 0; }
-  .today-stat { font-size: 11px; font-weight: 600; color: var(--accent, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .today-stat { font-size: 11px; font-weight: 600; color: var(--accent-fg, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history {
     display: flex; flex-direction: column; gap: 1px;
     max-height: 264px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -344,10 +333,10 @@
   .history a:hover { background: rgba(255,255,255,.06); }
   .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-artist { flex-shrink: 0; max-width: 34%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent, #8a919e); }
+  .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent-fg, #8a919e); }
   .history .h-dev svg { width: 14px; height: 14px; display: block; }
   /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
-  .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent, #8a919e); font-variant-numeric: tabular-nums; }
+  .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent-fg, #8a919e); font-variant-numeric: tabular-nums; }
   .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
   .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
@@ -361,7 +350,7 @@
     cursor: pointer; transition: background .2s ease, transform .1s ease, color .2s ease, border-color .2s ease;
   }
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
-  .preview-btn.playing { color: var(--accent, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
+  .preview-btn.playing { color: var(--accent-fg, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
   /* ---- 表情反应(2026-07-12新增,几经改版):全站统一一份计数,跟哪首歌没关系(最初
      设计成按歌曲分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。最早挂在
      .comments-wrap 里、"留言"标题正上方;2026-07-16 精简成只剩 1 个赞之后,用户反馈
@@ -468,9 +457,7 @@
   /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / light=浅色 ---- */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
-  :root[data-theme="light"] #bg { filter: blur(60px) saturate(1.5) brightness(1.02); opacity: .4; }
-  :root[data-theme="light"] .flow.on { opacity: .3; }
-  :root[data-theme="light"] .card { background: rgba(255,255,255,.74); border-color: rgba(0,0,0,.08); box-shadow: 0 24px 80px rgba(0,0,0,.22); }
+  :root[data-theme="light"] .card { background: color-mix(in srgb, var(--accent, transparent) 10%, rgba(255,255,255,.74)); border-color: rgba(0,0,0,.08); box-shadow: 0 24px 80px rgba(0,0,0,.22); }
   :root[data-theme="light"] h1 { color: #1c1f26; }
   :root[data-theme="light"] .artist { color: #3a404b; }
   :root[data-theme="light"] .album,
@@ -575,9 +562,6 @@
 </style>
 </head>
 <body>
-<div id="bg"></div>
-<div id="flow-a" class="flow on"></div>
-<div id="flow-b" class="flow"></div>
 <main class="card">
   <div id="tools" class="tools">
     <button id="tools-toggle" class="tool-btn tools-toggle" data-i18n-title="moreSettings" data-i18n-aria="expandSettings" aria-expanded="false"><span>⋯</span></button>
@@ -976,7 +960,7 @@
     // 给的还是客户端兜底的)撤掉(实测坐实:2026-07-10,这条清空分支曾经把刚兜底成功的图冲掉)。
     if (art) {
       if (art !== lastAppliedArt) {
-        imgEl.src = art; el('bg').style.backgroundImage = `url("${art}")`;
+        imgEl.src = art;
         lastAppliedArt = art;
       }
       artResolvedKey = key;
@@ -993,7 +977,7 @@
       clearArtTimer = setTimeout(() => {
         clearArtTimer = null;
         if (curKey === forKey && artResolvedKey !== forKey) {
-          imgEl.removeAttribute('src'); el('bg').style.backgroundImage = '';
+          imgEl.removeAttribute('src');
           lastAppliedArt = '';
         }
       }, POLL_MS + 2000);
@@ -1033,45 +1017,34 @@
     }
     return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
   }
-  // --accent 这个原始 hex 同时喂给两处性质完全不同的地方:大片、低对比度的氛围光晕
-  // (flow blob,下面 S/L 夹到 [48,85]/[46,62] 那一段,本来就该跟模糊封面融在一起)、
-  // 以及压在同一片模糊背景之上、必须让人一眼认出来的前景元素(进度条、歌词高亮)——
-  // 两者共用同一个值,遇到本身就偏暗/偏灰/偏浅的封面主色,前景元素跟它背后那片同色调
-  // 模糊背景亮度/饱和度靠得太近,糊在一起分不清(2026-07-30 用户实测反馈)。派生出单独
-  // 一个 --accent-fg 专供前景用:饱和度统一拉高保证"看得出这是个颜色",亮度按当前
-  // 主题往跟氛围光晕相反的方向夹(氛围底默认主题背景整体偏暗,前景推亮;浅色主题背景
-  // 整体偏白,前景推暗),跟背景天然拉开亮度差,而不是碰巧撞进同一个亮度区间。
+  // --accent 这个原始 hex 现在只喂给"卡片圆角矩形以内"的几处东西:卡片自己的底色
+  // (见 .card 的 background,color-mix 直接染)、专辑封面/黑胶唱片外圈发光(.art/.disc
+  // 的 box-shadow,原样用 var(--accent))、进度条/歌词高亮(用下面派生出的
+  // --accent-fg)。卡片以外("最外围")2026-07-30 起固定不变,不再有任何东西跟着这个
+  // hex 变——不需要再往 body 一级设置任何色斑/背景变量。
+  //
+  // --accent-fg 专供进度条/歌词高亮这类必须让人一眼认出来的前景文字用:饱和度统一拉高
+  // 保证"看得出这是个颜色",亮度按当前主题往跟卡片底色的模糊/半透明背景相反的方向夹
+  // (氛围底默认主题卡片整体偏暗,前景推亮;浅色主题卡片整体偏白,前景推暗),避免前景
+  // 跟卡片自己的底色亮度太接近、糊在一起分不清(2026-07-30 用户实测反馈)。
   function accentFgHsl(h, s, l) {
     const isLight = document.documentElement.dataset.theme === 'light';
     const S = Math.min(90, Math.max(60, s));
     const L = isLight ? Math.min(44, Math.max(28, l)) : Math.min(80, Math.max(66, l));
     return `hsl(${h} ${S}% ${L}%)`;
   }
-  // flow-a/flow-b 交替担任"当前显示"的色斑层;flowOn 记录哪一层现在亮着(0=a,1=b)。
-  // 同一个 hex 重复调用(同曲每次 poll 都会来一次)不重新触发交叉淡入淡出——但
-  // --accent-fg 每次都要重算而不能跟着一起被这层去重跳过,不然切主题(浅色/氛围底)
-  // 那一刻明明没换歌、hex 没变,前景色也不会跟着换。
-  let flowOn = 0, lastAccentHex = '';
+  let lastAccentHex = '';
   function setAccent(hex) {
     const root = document.documentElement;
     if (hex && /^#[0-9a-fA-F]{6}$/.test(hex)) {
       root.style.setProperty('--accent', hex);
+      lastAccentHex = hex;
       const [h, s, l] = hexToHsl(hex);
       root.style.setProperty('--accent-fg', accentFgHsl(h, s, l));
-      if (hex === lastAccentHex) return;
-      lastAccentHex = hex;
-      const S = Math.min(85, Math.max(48, s)), L = Math.min(62, Math.max(46, l));
-      const c1 = `hsl(${h} ${S}% ${L}%)`, c2 = `hsl(${(h + 38) % 360} ${S}% ${L}%)`, c3 = `hsl(${(h + 322) % 360} ${S}% ${L}%)`;
-      const next = el(flowOn ? 'flow-a' : 'flow-b'), prev = el(flowOn ? 'flow-b' : 'flow-a');
-      next.style.setProperty('--fc1', c1); next.style.setProperty('--fc2', c2); next.style.setProperty('--fc3', c3);
-      next.classList.add('on');
-      prev.classList.remove('on');
-      flowOn = flowOn ? 0 : 1;
     } else {
       lastAccentHex = '';
       root.style.removeProperty('--accent');
       root.style.removeProperty('--accent-fg');
-      el('flow-a').classList.remove('on'); el('flow-b').classList.remove('on');
     }
   }
   // 主题切换(氛围/浅色)本身不换歌、hex 不变,但 --accent-fg 该往哪边夹取决于主题——
