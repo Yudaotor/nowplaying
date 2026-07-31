@@ -293,10 +293,10 @@
   .lrc-line.lrc-near { opacity: .6; }
   .lrc-line.active { opacity: 1; transform: scale(1.04); transform-origin: center; }
   @media (prefers-reduced-motion: reduce) { .lrc-line.active { transform: none; } }
-  .lrc-roma { font-size: 11px; line-height: 1.25; color: #838a97; margin-bottom: 1px; }
-  .lrc-main { font-size: 14px; line-height: 1.36; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
+  .lrc-roma { font-size: 13px; line-height: 1.3; color: #838a97; margin-bottom: 2px; }
+  .lrc-main { font-size: 18px; line-height: 1.4; font-weight: 700; color: #aab0bc; transition: color .3s ease; }
   .lrc-line.active .lrc-main { color: var(--accent-fg, #f2f4f7); } /* 行级高亮(无逐字时) */
-  .lrc-tr { font-size: 12px; line-height: 1.25; color: #838a97; margin-top: 1px; font-weight: 400; }
+  .lrc-tr { font-size: 14px; line-height: 1.3; color: #838a97; margin-top: 2px; font-weight: 400; }
   /* 逐字(yrc):每个词随时间从左到右"渐变扫过"填色,而不是整词硬切。--fill 由 syncLyrics
      每帧更新,渐变里留一段软过渡区(±9%),看起来是慢慢填满这个词。--fill 故意不夹到
      [0,100]——还没轮到/早就唱完的词,真实值可能是很负/很大的百分比,交给下面 calc()
