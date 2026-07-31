@@ -98,20 +98,32 @@
       display: grid;
       grid-template-columns: 340px minmax(0, 1fr);
       column-gap: 44px;
-      /* align-items 用默认的 stretch(不再显式 start)——.side 会被拉伸到跟左边封面列
-         一样高,配合下面 .lyrics.show 的 flex:1,歌词框自动填满这份高度,不再在卡片
-         底部留一截空白(2026-07-31 用户反馈"歌词变长一点,现在下面还有很多空的")。 */
+      /* align-items:start(不是 stretch)——这不是随手写的默认值,是修一个实测坐实的
+         严重 bug:2026-07-31 曾经把这里改成默认的 stretch,想让 .side 跟着封面列拉伸、
+         配合 JS 算出的歌词高度撑满。结果是一个自我放大的死循环:stretch 会把 .np
+         拉伸到"当前行高"这个渲染后的尺寸,而不是它自己内容需要的高度;下面
+         syncHeroLyricsHeight() 又用 offsetHeight 去量 .np——量到的是"已经被拉伸过
+         一次"的高度,不是真实内容高度;拿这个偏大的值去设置 #lyrics 的高度,会让
+         .side 更高、行高跟着变得更高、.np 被 stretch 拉伸到更高……ResizeObserver
+         每次都会因为 .np 尺寸变了而重新触发,整个循环没有收敛点,表现为"歌词一直
+         无限往下拉、页面被无限拉长"(用户原话)。改回 start:.np/.side 都只用自己
+         内容需要的高度、互不影响,JS 量到的 .np 高度永远是真实、不受自身设置影响的
+         稳定值,循环从源头断开——不需要辅以任何"设置前后对比、没变化就跳过"这类
+         补丁式判断。⚠️ 不要在 .np 上额外加 align-self 覆盖这个默认值:沉浸模式
+         (:root[data-immersive])在 820px 断点下对同一个 .card.hero.two-col 选择器
+         设了 align-items:center(要把封面/歌词那一整行垂直居中),靠的正是选择器本身
+         带 [data-immersive] 属性、天然比这条规则更具体、覆盖得过——如果给 .np 单独写
+         一条 align-self,那条声明会不看上下文、无条件覆盖 align-items,把沉浸模式的
+         居中效果也顶掉。 */
+      align-items: start;
       padding: 40px 44px 28px;
     }
     .card.hero.two-col .side { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
     .card.hero.two-col .art-wrap { width: 240px; height: 240px; }
-    /* 300px 只是 JS 算出真实高度前的兜底值——CSS Grid 的 auto 行高是拿"两栏内容各自的
-       固有高度"取最大值来定,歌词一长(几十行),.side 的固有高度会比封面列本身还高,
-       连带把整行网格撑到跟歌词一样高(实测坐实:2026-07-31 测了 40 行长歌词才发现,
-       flex:1/min-height:0 这类纯 CSS 手段都救不了,因为问题出在"行高本身先被撑大了",
-       不是"没伸展到位")。真正的高度匹配交给下面 syncHeroLyricsHeight() 用 JS 量出封面列
-       (.np)的实际渲染高度再显式写回来,配合 ResizeObserver 自动感知标题换行/切换黑胶
-       模式等任何会改变 .np 高度的情况,不需要在每个触发点手动调用。 */
+    /* 300px 只是 JS 算出真实高度前的兜底值——真正的高度匹配交给下面
+       syncHeroLyricsHeight() 用 JS 量出封面列(.np,上面已经保证不参与 stretch)的
+       高度再显式写回来,配合 ResizeObserver 自动感知标题换行/切换黑胶模式等任何会
+       改变 .np 高度的情况,不需要在每个触发点手动调用。 */
     .card.hero.two-col .lyrics.show { height: 300px; margin-top: 2px; }
     /* .secondary 跟 .hero 是不是两栏无关,宽屏下始终铺满同样的卡片宽度,让历史表格/
        留言输入框/Top10 歌手头像有更多横向空间,不用挤在原来右栏那条窄列里。 */
@@ -1590,7 +1602,13 @@
     const lyricsEl = el('lyrics');
     const npEl = document.querySelector('.np');
     const wide = window.matchMedia('(min-width: 820px)').matches;
-    if (wide && document.querySelector('.card.hero').classList.contains('two-col') && npEl) {
+    // 沉浸模式(data-immersive)不吃这一套——它有自己一套按 vh 算的歌词高度(见
+    // :root[data-immersive] .lyrics.show 的 CSS 规则,想要的是"跟屏幕高度成比例地放大",
+    // 不是"跟封面列的固定内容高度对齐")。这里若不判断直接写行内 style.height,行内样式
+    // 的优先级天生高于任何 class 选择器,会无条件盖掉沉浸模式那几条 vh 规则——显式清空
+    // 交还控制权给 CSS,跟单栏/窄屏那个 else 分支同一个道理。
+    const immersive = document.documentElement.hasAttribute('data-immersive');
+    if (wide && !immersive && document.querySelector('.card.hero').classList.contains('two-col') && npEl) {
       lyricsEl.style.height = npEl.offsetHeight + 'px';
     } else {
       lyricsEl.style.height = '';
