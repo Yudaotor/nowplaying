@@ -20,7 +20,23 @@
 <meta name="twitter:image" content="https://np.yudaotor.me/cover">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <style>
-  :root { color-scheme: dark; }
+  /* 统一字号阶梯(2026-07-31)——标题(h1/.artist/.album)和歌词三行(.lrc-roma/
+     .lrc-main/.lrc-tr)这次单独调过、各自有专属的层级关系,不纳入这套通用阶梯;
+     这里统一的是页面其余部分(历史列表/留言墙/Top10歌手/状态徽章/页脚小字等)——
+     这些原来是十几轮改动各自零散定的字号(9/10/11/12/13/15px 混杂,同样是"次要
+     说明文字"这个角色在不同模块字号却不一样),现在收敛成 4 档,新增/修改这类文字
+     统一改这里的变量,不要再各自写字面量像素值:
+     --fs-micro  时间戳/角标数字/列表次要说明这类最不起眼的辅助信息
+     --fs-caption 歌手名/专辑名/留言时间戳这类列表次要文字
+     --fs-body   留言正文/历史歌名/输入框这类主要可读文字
+     --fs-label  小节标题(最近播放/留言/历史播放Top10歌手),统一加粗 */
+  :root {
+    color-scheme: dark;
+    --fs-micro: 11px;
+    --fs-caption: 12px;
+    --fs-body: 13px;
+    --fs-label: 15px;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     min-height: 100vh;
@@ -203,7 +219,7 @@
   .tools-toggle.on span { transform: rotate(90deg); } /* "⋯" 转90°看起来像"⋮",暗示"已展开" */
   .status {
     display: inline-flex; align-items: center; gap: 8px;
-    font-size: 13px; font-weight: 600; letter-spacing: .4px;
+    font-size: var(--fs-body); font-weight: 600; letter-spacing: .4px;
     padding: 6px 14px; border-radius: 999px; margin-bottom: 18px;
     background: rgba(255,255,255,.08); color: #9aa3b2;
   }
@@ -280,7 +296,7 @@
   }
   .times {
     display: flex; justify-content: space-between; margin-top: 8px;
-    font-size: 11px; color: #8a91a0; font-variant-numeric: tabular-nums;
+    font-size: var(--fs-micro); color: #8a91a0; font-variant-numeric: tabular-nums;
   }
   /* 同步歌词：固定高度视口，原生滚动把当前行滚到中间(可手动滑动)，上下渐隐遮罩。 */
   .lyrics { display: none; margin-top: 20px; height: 132px; overflow-y: auto; overflow-x: hidden;
@@ -344,11 +360,11 @@
      自己的 padding 已经留出顶部空间),不需要再跟"上面还有别的东西"这件事打交道。 */
   .history-wrap { text-align: left; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-  .history-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; }
+  .history-title { font-size: var(--fs-label); font-weight: 700; letter-spacing: .2px; color: #6b7280; }
   /* "近30天播放"列名:右对齐,跟每行 .h-count 徽章对齐,说明那个数字列是什么意思。 */
   /* 列名跟下面每行的 .h-dev/.h-title/.h-artist/.h-count 一一对齐:占位宽度用同一套数字。 */
   .history-cols { display: flex; align-items: baseline; gap: 10px; padding: 0 8px 4px; }
-  .history-cols span { font-size: 10px; color: #6b7280; letter-spacing: .2px; opacity: .8; }
+  .history-cols span { font-size: var(--fs-micro); color: #6b7280; letter-spacing: .2px; opacity: .8; }
   .history-cols .hc-dev { flex-shrink: 0; width: 14px; }
   .history-cols .hc-title { flex: 1; min-width: 0; }
   .history-cols .hc-album { flex-shrink: 0; width: 22%; }
@@ -356,11 +372,11 @@
   .history-cols .hc-count { flex-shrink: 0; width: 40px; text-align: right; }
   /* 历史列表里"今天"和"更早"之间的分界线:靠左小标签 + 向右延伸的细线。 */
   .h-divider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 4px;
-    font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    font-size: var(--fs-micro); font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
     color: #6b7280; opacity: .8; user-select: none; }
   .h-divider::after { content: ''; flex: 1; height: 1px; background: currentColor; opacity: .3; }
   .h-divider:first-child { margin-top: 0; }
-  .today-stat { font-size: 11px; font-weight: 600; color: var(--accent-fg, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .today-stat { font-size: var(--fs-micro); font-weight: 600; color: var(--accent-fg, #8a91a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history {
     display: flex; flex-direction: column; gap: 1px;
     max-height: 264px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -374,12 +390,12 @@
     border-radius: 8px; text-decoration: none; transition: background .15s ease;
   }
   .history a:hover { background: rgba(255,255,255,.06); }
-  .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-title { flex: 1; min-width: 0; font-size: var(--fs-body); color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* 专辑/歌手列宽度必须跟表头 .hc-album/.hc-artist 用完全一样的写法(width,不是
      max-width)——之前歌手列用 max-width:34%,同一列每一行会按各自文本长度伸缩,
      跟表头固定 34% 宽度对不齐;改成 width 后每一行永远是同一个宽度,才能真正对齐。 */
-  .history .h-album { flex-shrink: 0; width: 22%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-artist { flex-shrink: 0; width: 20%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-album { flex-shrink: 0; width: 22%; font-size: var(--fs-caption); color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-artist { flex-shrink: 0; width: 20%; font-size: var(--fs-caption); color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* 固定宽度跟表头 .hc-dev 一致,且 JS 侧(renderHistory)现在每一行都无条件创建这个
      元素(没有设备信息时留空,不是不创建)——这两点缺一不可:之前"没有设备图标的那一行
      干脆不生成这个 flex 子项",导致那一行少了一个 flex item,后面的歌名/歌手/次数会
@@ -387,10 +403,10 @@
   .history .h-dev { flex-shrink: 0; width: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-fg, #8a919e); }
   .history .h-dev svg { width: 14px; height: 14px; display: block; }
   /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
-  .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent-fg, #8a919e); font-variant-numeric: tabular-nums; }
-  .meta { margin-top: 24px; font-size: 12px; color: #6b7280; }
+  .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: var(--fs-micro); font-weight: 700; color: var(--accent-fg, #8a919e); font-variant-numeric: tabular-nums; }
+  .meta { margin-top: 24px; font-size: var(--fs-caption); color: #6b7280; }
   .meta a { color: #8a91a0; text-decoration: none; }
-  .idle-note { font-size: 14px; color: #9aa3b2; line-height: 1.7; }
+  .idle-note { font-size: var(--fs-body); color: #9aa3b2; line-height: 1.7; }
   /* 试听按钮:挪进平台链接那一排(排在最前,跟出站链接图标同宽高、同静止态样式,视觉上
      属于一组),不再盖在黑胶/封面上(实测坐实:2026-07-11,右下角悬浮钮会挡住黑胶露出
      的那一小圈边和唱臂落下的位置)。播放中复用 .tool-btn.on 同款 accent 高亮写法。 */
@@ -415,7 +431,7 @@
   .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 0 0 6px; }
   /* 2026-07-16:表情从 6 个精简成 1 个赞之后,单独一个胶囊按钮容易让人看不懂是干嘛的,
      加一行小字提示——字号/颜色跟 .comments-empty 那类"页面里的次要说明文字"同一套。 */
-  .reactions-hint { font-size: 11px; color: #6b7280; margin: 0; }
+  .reactions-hint { font-size: var(--fs-caption); color: #6b7280; margin: 0; }
   .reaction-btn {
     display: inline-flex; align-items: center; gap: 5px;
     height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
@@ -425,7 +441,7 @@
   }
   .reaction-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .reaction-btn:disabled { opacity: .6; cursor: default; transform: none; }
-  .r-count { font-size: 11px; font-weight: 700; color: #9aa3b2; font-variant-numeric: tabular-nums; min-width: 8px; }
+  .r-count { font-size: var(--fs-micro); font-weight: 700; color: #9aa3b2; font-variant-numeric: tabular-nums; min-width: 8px; }
   /* ---- 留言墙(2026-07-12新增):挂在 .side 里、历史列表之后,复用 .history-wrap/.history
      的滚动列表样式。留言内容用 textContent 渲染(见 initComments),天然防 XSS,后端不做
      二次转义(转义后再 textContent 会把 &lt; 这类符号原样显示给所有人看,是错的)。 ---- */
@@ -439,7 +455,7 @@
   .secondary:has(.history-wrap:not(.hidden), .top-artists-wrap:not(.hidden)) .comments-wrap {
     margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08);
   }
-  .comments-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; margin-bottom: 8px; }
+  .comments-title { font-size: var(--fs-label); font-weight: 700; letter-spacing: .2px; color: #6b7280; margin-bottom: 8px; }
   .comments {
     display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px;
     max-height: 200px; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -448,24 +464,24 @@
   .comments::-webkit-scrollbar { width: 6px; }
   .comments::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
   .comments::-webkit-scrollbar-track { background: transparent; }
-  .comments-empty { font-size: 12px; color: #6b7280; padding: 6px 2px; }
+  .comments-empty { font-size: var(--fs-caption); color: #6b7280; padding: 6px 2px; }
   .comment-row { padding: 6px 2px; }
   .c-head { display: flex; align-items: baseline; gap: 8px; }
-  .c-name { font-size: 12px; font-weight: 700; color: #c8cdd6; }
-  .c-time { font-size: 10px; color: #6b7280; }
-  .c-text { font-size: 13px; color: #dfe2e7; margin-top: 2px; overflow-wrap: anywhere; }
+  .c-name { font-size: var(--fs-caption); font-weight: 700; color: #c8cdd6; }
+  .c-time { font-size: var(--fs-micro); color: #6b7280; }
+  .c-text { font-size: var(--fs-body); color: #dfe2e7; margin-top: 2px; overflow-wrap: anywhere; }
   .comment-form { display: flex; flex-wrap: wrap; gap: 8px; }
   .comment-name-input, .comment-text {
     padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.06); color: #f5f6f8; font-size: 13px; font-family: inherit;
+    background: rgba(255,255,255,.06); color: #f5f6f8; font-size: var(--fs-body); font-family: inherit;
   }
-  .comment-name-input { width: 84px; flex-shrink: 0; font-size: 12px; }
+  .comment-name-input { width: 84px; flex-shrink: 0; }
   .comment-text { flex: 1 1 160px; min-width: 0; }
   .comment-name-input::placeholder, .comment-text::placeholder { color: #6b7280; }
   .comment-name-input:focus, .comment-text:focus { outline: none; border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); }
   .comment-submit {
     flex-shrink: 0; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.08); color: #eef0f4; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: rgba(255,255,255,.08); color: #eef0f4; font-size: var(--fs-body); font-weight: 600; cursor: pointer;
     transition: background .2s ease;
   }
   .comment-submit:hover { background: rgba(255,255,255,.16); }
@@ -493,11 +509,11 @@
   .history-wrap:not(.hidden) + .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
   .top-artists-wrap.hidden { display: none; }
   .top-artists-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-  .top-artists-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; }
+  .top-artists-title { font-size: var(--fs-label); font-weight: 700; letter-spacing: .2px; color: #6b7280; }
   /* 采集器一天才推一次这份榜单(见 initTopArtists 注释),不是实时数据——标一下更新
      时间,免得被当成"这一刻"的排名。跟 .today-stat 同款相对时间文案(relTime),但这里
      只是提示性信息、不需要强调色抢眼,跟标题一样用安静的灰。 */
-  .top-artists-updated { font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .top-artists-updated { font-size: var(--fs-micro); color: #6b7280; white-space: nowrap; }
   .top-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 14px 6px; }
   .ta-item { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-decoration: none; }
   .ta-avatar-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
@@ -517,13 +533,13 @@
     box-shadow: 0 0 0 2px rgba(22,25,33,.9);
   }
   .ta-name {
-    font-size: 11px; color: #c8cdd6; text-align: center; max-width: 100%;
+    font-size: var(--fs-micro); color: #c8cdd6; text-align: center; max-width: 100%;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   /* ---- 访客计数(2026-07-12新增):挂在 footer-meta 旁边(是兄弟元素,不是子元素!
      renderSourceMeta() 每轮 poll 都会整体覆写 #footer-meta 的 textContent,放里面会被
      反复清空)。localStorage 的 np:visited 去重:同一浏览器只在"从未访问过"时才 POST 一次。 ---- */
-  .visitor-count { margin-top: 4px; font-size: 11px; color: #6b7280; }
+  .visitor-count { margin-top: 4px; font-size: var(--fs-micro); color: #6b7280; }
   /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / light=浅色 ---- */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
