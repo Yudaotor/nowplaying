@@ -264,6 +264,7 @@
     position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
     border-radius: 999px; background: var(--accent-fg, #f5f6f8);
     transition: background .8s ease;
+    isolation: isolate; /* 见下面 .bar-pulse 注释:把它的 screen 混合锁在这个盒子内部 */
   }
   /* 播放头呼吸光晕:骑在 bar-fill 右边缘(即当前播放位置),播放时呼吸,暂停立即收起——
      一眼就能看出是否在播放。是 bar-fill 的伪元素,天然跟着 width% 走,不用额外 JS 定位。
@@ -297,6 +298,48 @@
       animation: none;
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-fg, #f5f6f8) 35%, transparent);
     }
+  }
+  /* 播放中沿着已播放进度"流动"的能量脉冲——从歌曲开头(0%)一路扫到当前播放位置
+     (.bar-fill 自己的右边缘,天然就是它自身的 100%),循环往复。跟上面播放头呼吸
+     光晕是两种独立的视觉语言、互不冲突:光晕定在原地示意"此刻",这道脉冲流动
+     示意"经过的这段路"。用真实子元素(不是伪元素)——.bar-fill 自己的
+     ::before/::after 已经被头部呼吸光晕占用,一个元素最多两个伪元素,放不下第三层。
+     .bar-fill-clip 单独负责裁剪(overflow:hidden,border-radius:inherit 保持跟外层
+     一致的胶囊形状)——不能把 overflow:hidden 直接加到 .bar-fill 本身,那样会连带
+     裁掉头部光晕(它的伪元素用 right:-1px 故意探出边界一点点,做出"卡在播放头上"的
+     视觉)。宽度用固定 px 而不是 .bar-fill 的百分比——歌曲刚开始播放、.bar-fill 本身
+     还很窄时,百分比宽度会细成几乎看不见的一条线;固定像素能保证任何进度下这道
+     脉冲的粗细都一致,唯一变化的只是"走多远"(靠 left 的 0%→100% 关键帧,天然锚定
+     在 .bar-fill 当前的真实宽度上,进度条每帧更新宽度时这道脉冲的终点跟着一起走,
+     不需要额外同步代码)。
+     ⚠️ 高亮颜色不能用跟 .bar-fill 底色相同的 var(--accent-fg)——半透明的某颜色叠在
+     同一个颜色的不透明底色上,合成结果恒等于底色本身,无论透明度多高都不会产生任何
+     可见差异(实测坐实:第一版这么写,截图看着progress条从头到尾就是纯一色,肉眼
+     根本看不出有个东西在动)。改用白色高亮 + mix-blend-mode:screen——screen 混合
+     会让叠加处始终变亮,不管当前 accent 是什么色相都能形成对比,不需要跟着每首歌的
+     主题色单独适配一份"更亮版本"。.bar-fill 加 isolation:isolate,把这个 screen
+     混合的取样范围锁定在它自己内部(只跟自己的纯色底混,不会透到 .bar 灰色轨道或
+     再往后的页面背景)。 */
+  .bar-fill-clip {
+    position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none;
+  }
+  .bar-pulse {
+    position: absolute; top: 0; bottom: 0; left: -60px; width: 60px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.95) 100%);
+    mix-blend-mode: screen;
+    filter: blur(1px);
+    opacity: 0;
+  }
+  .progress.is-live .bar-pulse {
+    opacity: .85;
+    animation: bar-pulse-flow 2.2s linear infinite;
+  }
+  @keyframes bar-pulse-flow {
+    from { left: -60px; }
+    to   { left: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar-pulse { display: none; }
   }
   .times {
     display: flex; justify-content: space-between; margin-top: 8px;
@@ -670,7 +713,7 @@
   <div id="artist" class="artist"></div>
   <div id="album" class="album"></div>
   <div id="progress" class="progress">
-    <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
+    <div class="bar"><div id="bar-fill" class="bar-fill"><span class="bar-fill-clip"><span class="bar-pulse"></span></span></div></div>
     <div class="times"><span id="t-cur">0:00</span><span id="t-dur">0:00</span></div>
   </div>
   <div id="links" class="links">
