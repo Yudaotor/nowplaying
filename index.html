@@ -31,6 +31,10 @@
     color: #f5f6f8;
     display: grid;
     place-items: center;
+    /* 2026-07-31 起页面主体是两张纵向堆叠的卡片(.hero 封面+歌词、.secondary 其它模块),
+       gap 留出两者之间的呼吸空间——body 本身没设 grid-template,两个 .card 子元素按隐式
+       网格自动各占一行,place-items:center 让每一行都独立居中,不用额外包一层容器。 */
+    gap: 24px;
     /* 内容比屏幕高时页面正常滚动(不再 overflow:hidden 裁切)；带安全区避让刘海/底条。 */
     padding: max(20px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
     overflow-x: hidden;
@@ -85,36 +89,26 @@
     text-align: center;
     transition: opacity .35s ease, background .8s ease;
   }
-  /* 宽屏(≥820px)且有侧栏内容(歌词/历史)时，横向铺成两栏：左=正在播放，右=歌词+历史。 */
+  /* 宽屏(≥820px)且有歌词时,.hero 横向铺成两栏:左=封面/正在播放,右=歌词,左右对齐。
+     没歌词就维持单栏(封面居中),因为已经没有别的东西可以跟封面并排了——历史/留言/
+     Top10歌手/表情反应/页脚这些跟"当下播放"关系不大的模块,2026-07-31 起拆到下面
+     .secondary 这张独立卡片里,不再参与这里的两栏判断,所以这里只剩 np/side 两个
+     区域,不需要 grid-template-areas 也不需要管 ta/react/meta(见 updateLayout())。 */
   @media (min-width: 820px) {
-    .card.two-col {
+    .card.hero.two-col {
       width: min(94vw, 900px);
       display: grid;
       grid-template-columns: 340px minmax(0, 1fr);
-      /* "side" 在 np/ta 两行里重复同一个名字,意思是它横跨这两行(右栏一路打通,
-         跟原来只有一行"side"时视觉上是一样高)——ta(top-artists-wrap)单独占左栏
-         第二行,让它在宽屏视觉上仍然落在"左栏、播放链接行下方",跟 DOM 顺序(现在
-         .top-artists-wrap 已经挪到 .side 后面)无关。react(reactions-footer)/meta
-         各自单独占一整行、横跨两栏,让表情反应真的落在页面最下面、跟访问次数挨在
-         一起,不用去纠结"多个元素共用同一个 grid-area 到底会不会互相压住"这种细节——
-         每个命名区域都只对应一个真正的元素(reactions-footer 这一整行只有它自己,
-         meta 那行虽然是 .meta+.visitor-count 两个元素共用,但那是改这次之前就有的
-         写法,两者本来就是纵向堆叠的短文字,没出过问题,不用跟着换)。 */
-      grid-template-areas: "np side" "ta side" "react react" "meta meta";
-      column-gap: 44px; row-gap: 6px;
+      column-gap: 44px;
       align-items: start;
       padding: 40px 44px 28px;
     }
-    .card.two-col .np   { grid-area: np; }
-    .card.two-col .side { grid-area: side; display: flex; flex-direction: column; min-width: 0; }
-    .card.two-col .top-artists-wrap { grid-area: ta; }
-    .card.two-col .reactions-footer { grid-area: react; }
-    .card.two-col .meta,
-    .card.two-col .visitor-count { grid-area: meta; }
-    .card.two-col .art-wrap { width: 240px; height: 240px; }
-    .card.two-col .lyrics.show { height: 300px; margin-top: 2px; }
-    .card.two-col .history-wrap { margin-top: 20px; border-top: none; padding-top: 0; }
-    .card.two-col .history { max-height: 300px; }
+    .card.hero.two-col .side { display: flex; flex-direction: column; min-width: 0; }
+    .card.hero.two-col .art-wrap { width: 240px; height: 240px; }
+    .card.hero.two-col .lyrics.show { height: 300px; margin-top: 2px; }
+    /* .secondary 跟 .hero 是不是两栏无关,宽屏下始终铺满同样的卡片宽度,让历史表格/
+       留言输入框/Top10 歌手头像有更多横向空间,不用挤在原来右栏那条窄列里。 */
+    .secondary { width: min(94vw, 900px); }
   }
   .side { min-width: 0; }
   /* 首屏显示的是本地缓存的上一首，标记为“更新中”(降透明度)，拉到实时数据后恢复。 */
@@ -319,7 +313,9 @@
   .ic.show { display: inline-flex; }
   .ic:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .ic svg { width: 22px; height: 22px; display: block; }
-  .history-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  /* 不带顶部分隔线/留白——2026-07-31 起它永远是 .secondary 卡片里的第一个模块(卡片
+     自己的 padding 已经留出顶部空间),不需要再跟"上面还有别的东西"这件事打交道。 */
+  .history-wrap { text-align: left; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
   .history-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; }
   /* "近30天播放"列名:右对齐,跟每行 .h-count 徽章对齐,说明那个数字列是什么意思。 */
@@ -374,9 +370,8 @@
      设计成按歌曲分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。最早挂在
      .comments-wrap 里、"留言"标题正上方;2026-07-16 精简成只剩 1 个赞之后,用户反馈
      "既然只有一个的话，可以和统计次数那个放在一起，都在页面最底下"——现在跟
-     #footer-meta/#visitor-count 一样是 .card 的直接子节点、挂在最后,包一层
-     .reactions-footer 方便宽屏 grid 布局整体当一个区块摆放(不用纠结多个元素共用
-     同一个 grid-area 到底会不会互相压住,见下面 @media 里的注释)。跟留言墙共用 60s
+     #footer-meta/#visitor-count 一样是(2026-07-31 起).secondary 的直接子节点、挂在
+     最后,包一层 .reactions-footer 方便整体当一个区块摆放。跟留言墙共用 60s
      刷新节奏,不单独起轮询;真正防刷在后端(限流+每日预算),这里只做按钮级防抖。
      居中对齐,跟 #footer-meta/#visitor-count 那种页脚小字的版式一致(不再是挂在左对齐
      评论区里那版的左对齐)。 ---- */
@@ -398,7 +393,12 @@
   /* ---- 留言墙(2026-07-12新增):挂在 .side 里、历史列表之后,复用 .history-wrap/.history
      的滚动列表样式。留言内容用 textContent 渲染(见 initComments),天然防 XSS,后端不做
      二次转义(转义后再 textContent 会把 &lt; 这类符号原样显示给所有人看,是错的)。 ---- */
-  .comments-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  /* 留言墙"常驻显示、从不加 hidden"(见 updateLayout() 附近注释),但历史区
+     (.history-wrap)是否可见取决于 moduleConfig——只有历史区真的显示出来时,留言墙
+     才需要顶部分隔线区分"上一块";历史区隐藏时留言墙自己就是 .secondary 里第一个
+     可见模块,不该露出一条上面什么都没有的分隔线。 */
+  .comments-wrap { text-align: left; }
+  .history-wrap:not(.hidden) + .comments-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
   .comments-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; margin-bottom: 8px; }
   .comments {
     display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px;
@@ -440,10 +440,11 @@
      页面最底部——根源是 DOM 顺序:这个元素当时被挪进了 .np 内部、在 .side(留言墙所在)
      之前,窄屏没有 grid 时就按 DOM 顺序堆叠,自然排到留言区上面。改成 HTML 里挪到
      .side 后面(整个 .card 的最后一个内容块,紧挨底部的 Apple Music 归属文字之前)——
-     窄屏纯块状堆叠时就会顺理成章排到最后。宽屏(≥820px)则靠下面 .card.two-col 里新增
-     的 grid-area: ta 规则,在网格布局里精确摆回"左栏、播放链接行下方"这个原来的视觉
-     位置,不受 DOM 顺序影响——这正是用 CSS Grid 命名区域的意义:视觉位置和 DOM 顺序
-     解耦,不需要 JS 在两种布局之间搬 DOM 节点。 ---- */
+     窄屏纯块状堆叠时就会顺理成章排到最后。当时宽屏(≥820px)靠 grid-area: ta 规则精确
+     摆回"左栏、播放链接行下方"这个视觉位置——这套 grid-area 机制 2026-07-31 已经不存在
+     了:这个面板现在整个挪进了 .secondary 那张独立卡片(跟历史/留言/表情反应/页脚一起),
+     不再跟封面/歌词共用同一张卡片的网格,自然也不需要再摆回"左栏"这个位置,单纯跟着
+     .secondary 的纵向堆叠顺序走。 ---- */
   .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
   .top-artists-wrap.hidden { display: none; }
   .top-artists-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -501,14 +502,13 @@
   :root[data-theme="light"] .history .h-title { color: #2a2e37; }
   :root[data-theme="light"] .history .h-artist { color: #7a828f; }
   :root[data-theme="light"] .history a:hover { background: rgba(0,0,0,.05); }
-  :root[data-theme="light"] .history-wrap { border-top-color: rgba(0,0,0,.1); }
   :root[data-theme="light"] .ic { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
   :root[data-theme="light"] .ic:hover { background: rgba(0,0,0,.1); }
   :root[data-theme="light"] .tool-btn { color: #5a616e; border-color: rgba(0,0,0,.14); background: rgba(0,0,0,.05); }
   :root[data-theme="light"] .reaction-btn { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
   :root[data-theme="light"] .reaction-btn:hover { background: rgba(0,0,0,.1); }
   :root[data-theme="light"] .r-count { color: #7a828f; }
-  :root[data-theme="light"] .comments-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .history-wrap:not(.hidden) + .comments-wrap { border-top-color: rgba(0,0,0,.1); }
   :root[data-theme="light"] .comments-title,
   :root[data-theme="light"] .comments-empty,
   :root[data-theme="light"] .reactions-hint,
@@ -531,14 +531,9 @@
   :root[data-immersive] .tools { top: 18px; right: 18px; opacity: .3; }
   :root[data-immersive] .tools:hover { opacity: 1; }
   :root[data-immersive] .card,
-  :root[data-immersive] .card.two-col { width: min(96vw, 1200px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: none; padding: 3vh 4vw; }
+  :root[data-immersive] .card.hero.two-col { width: min(96vw, 1200px); background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; box-shadow: none; padding: 3vh 4vw; }
   :root[data-immersive] .links,
-  :root[data-immersive] .history-wrap,
-  :root[data-immersive] .comments-wrap,
-  :root[data-immersive] .top-artists-wrap,
-  :root[data-immersive] .reactions-footer,
-  :root[data-immersive] .meta,
-  :root[data-immersive] .visitor-count,
+  :root[data-immersive] .secondary,
   :root[data-immersive] .album { display: none; }
   /* 2026-07-16:.reactions 挪出 .comments-wrap、变成 .reactions-footer 包一层的独立
      区块之后,不再是"父级隐藏子级自然跟着隐藏"了——这里补上一条选择器,不然沉浸模式下
@@ -551,9 +546,9 @@
   :root[data-immersive] .lrc-tr { font-size: clamp(13px, 1.4vw, 18px); }
   :root[data-immersive] .lrc-roma { font-size: clamp(12px, 1.2vw, 15px); }
   @media (min-width: 820px) {
-    :root[data-immersive] .card.two-col { grid-template-columns: min(40vh, 400px) minmax(0, 1fr); column-gap: 6vw; align-items: center; }
-    :root[data-immersive] .card.two-col .art-wrap { width: min(40vh, 400px); height: min(40vh, 400px); }
-    :root[data-immersive] .card.two-col .lyrics.show { height: min(58vh, 620px); }
+    :root[data-immersive] .card.hero.two-col { grid-template-columns: min(40vh, 400px) minmax(0, 1fr); column-gap: 6vw; align-items: center; }
+    :root[data-immersive] .card.hero.two-col .art-wrap { width: min(40vh, 400px); height: min(40vh, 400px); }
+    :root[data-immersive] .card.hero.two-col .lyrics.show { height: min(58vh, 620px); }
   }
   /* ---- 移动端(≤600px)布局收紧:更小内边距/间距 + 响应式封面,让首屏尽量容下封面+信息+歌词开头 ---- */
   @media (max-width: 600px) {
@@ -569,9 +564,8 @@
     .reactions { gap: 8px; }
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
-    .history-wrap { margin-top: 16px; padding-top: 14px; }
     .history { max-height: 220px; }
-    .comments-wrap { margin-top: 16px; padding-top: 14px; }
+    .history-wrap:not(.hidden) + .comments-wrap { margin-top: 16px; padding-top: 14px; }
     .comments { max-height: 160px; }
     .meta { margin-top: 16px; }
     /* 工具钮抽屉:小屏幕横排三个圆钮会跟黑胶模式下悬在封面右上方的唱臂图形打架
@@ -589,7 +583,7 @@
 <body>
 <div id="glow-a" class="glow"></div>
 <div id="glow-b" class="glow"></div>
-<main class="card">
+<main class="card hero">
   <div id="tools" class="tools">
     <button id="tools-toggle" class="tool-btn tools-toggle" data-i18n-title="moreSettings" data-i18n-aria="expandSettings" aria-expanded="false"><span>⋯</span></button>
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
@@ -639,6 +633,14 @@
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
   <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
+  </div><!-- /.side -->
+</main>
+<!-- 2026-07-31 起,封面+歌词(上面 .hero)和其它模块拆成两个独立的矩形卡片——.hero 只
+     负责"正在播放"这一件事(封面/进度/歌词左右对齐),历史/留言/Top10歌手/表情反应/
+     页脚这些跟"当下在放什么"关系不大的模块,单独收进这张 .secondary 卡片里,视觉上
+     明确分开,不再挤在同一张卡片的右栏里。两栏与否只看 .hero 自己(见 updateLayout()),
+     跟 .secondary 无关——.secondary 在桌面宽屏下固定铺满卡片宽度(见下面 CSS)。 -->
+<div class="card secondary">
   <div id="history-wrap" class="history-wrap hidden">
     <div class="history-head">
       <span class="history-title" data-i18n="recentPlays">最近播放</span>
@@ -661,7 +663,6 @@
       <button id="comment-submit" class="comment-submit" type="submit" data-i18n="send">发送</button>
     </form>
   </div>
-  </div><!-- /.side -->
   <div id="top-artists-wrap" class="top-artists-wrap hidden">
     <div class="top-artists-head">
       <span class="top-artists-title" data-i18n="topArtists">历史播放 Top10 歌手</span>
@@ -675,7 +676,7 @@
   </div>
   <div id="footer-meta" class="meta">Apple Music</div>
   <div id="visitor-count" class="visitor-count hidden" data-i18n-title="visitorCountTitle" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
-</main>
+</div><!-- /.secondary -->
 <script>
 (() => {
   const params = new URLSearchParams(location.search);
@@ -1112,13 +1113,13 @@
 
   // 首屏显示的是本地缓存的上一首：置灰 + 状态显示“更新中…”，拉到实时数据后由 clear 恢复。
   function setStale(on) {
-    document.querySelector('.card').classList.toggle('stale', on);
+    document.querySelector('.card.hero').classList.toggle('stale', on);
     if (on) { el('status').classList.remove('live'); el('status-text').textContent = t('updating'); }
   }
   // 首次拉取失败(LB 挂/超时)时:别一直顶着“更新中…”,把缓存那首按“上次播放”正常显示、
   // 取消置灰(后台仍每 6s 悄悄重试,LB 恢复了会自动换成实时)。
   async function revertStale() {
-    if (!document.querySelector('.card').classList.contains('stale')) return;
+    if (!document.querySelector('.card.hero').classList.contains('stale')) return;
     const p = loadPersisted();
     if (p && p.title) {
       // 这份缓存如果是"当时正在播放、还没形成一条完成收听"时抓的(listenedAt 为空),直接
@@ -1130,7 +1131,7 @@
       await paint({ ...p, playing: false, listenedAt });
     }
     setProgress(null); // 退回"上次播放"语义,不是当下真实进度,别继续顶着一条不会走的进度条
-    document.querySelector('.card').classList.remove('stale');
+    document.querySelector('.card.hero').classList.remove('stale');
   }
 
   // 各平台单曲跳转链接（采集器解析后放进 additional_info）。只显示解析到的平台。
@@ -1509,15 +1510,12 @@
     wrap.classList.toggle('show', show);
     updateLayout();
   }
-  // 有侧栏内容(歌词/历史/留言墙)时才在宽屏铺两栏;留言墙(2026-07-12新增)常驻显示、
-  // 从不加 hidden,所以这个 || 分支目前恒为真——写成 classList 判断而不是直接 || true,
-  // 是为了以后如果给留言墙也加"空内容时隐藏"之类的逻辑,这里不用跟着改。
+  // 2026-07-31 起 .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏只看有没有
+  // 歌词——历史/留言墙/Top10歌手已经拆到 .secondary 那张独立卡片里(见旁边 HTML/CSS
+  // 注释),不再参与这个判断,.secondary 在宽屏下始终铺满卡片宽度,不需要 JS 干预。
   function updateLayout() {
-    // top-artists-wrap 现在是 .np/.side 的同级兄弟节点(2026-07-16 挪的,见它旁边 CSS
-    // 注释),不属于 .side 内部,依然不参与这个判断——是否铺两栏只看歌词/历史/留言墙。
-    const hasSide = el('lyrics').classList.contains('show') || !el('history-wrap').classList.contains('hidden')
-      || !el('comments-wrap').classList.contains('hidden');
-    document.querySelector('.card').classList.toggle('two-col', hasSide);
+    const hasLyrics = el('lyrics').classList.contains('show');
+    document.querySelector('.card.hero').classList.toggle('two-col', hasLyrics);
   }
   function syncLyrics(posMs) {
     if (!lrcLines.length) return;
