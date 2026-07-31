@@ -1207,11 +1207,10 @@
     if (USER === 'CHANGE_ME') return;
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
-    // ⚠️ album 字段(2026-07-31 新增专辑列)取决于 state-worker 的 /history 响应本身有没有
-    // 回传这个字段——那份代码在另一个仓库(Yudaotor/nowplaying-workers),这次没有检出到本地
-    // 没法确认/改动。这里按 x.album 读,worker 没给就是空字符串,列会显示为空(不报错、
-    // 不影响其它列),不是这边的 bug;直连 LB 兜底那条路径(下面)专辑数据是完整的,因为
-    // 直接从原始 listen 的 release_name 取。
+    // album 字段(2026-07-31 新增专辑列)由 state-worker(另一个仓库 Yudaotor/
+    // nowplaying-workers)的 lbHistory() 提供——它原本只归一化 title/artist/listenedAt/
+    // durationMs/device/url,漏了 album,已经在那边补上(读 release_name)并重新部署,
+    // 这里读 x.album 现在能拿到真实值。
     if (RELAY) {
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
