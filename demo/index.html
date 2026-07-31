@@ -98,11 +98,20 @@
       display: grid;
       grid-template-columns: 340px minmax(0, 1fr);
       column-gap: 44px;
-      align-items: start;
+      /* align-items 用默认的 stretch(不再显式 start)——.side 会被拉伸到跟左边封面列
+         一样高,配合下面 .lyrics.show 的 flex:1,歌词框自动填满这份高度,不再在卡片
+         底部留一截空白(2026-07-31 用户反馈"歌词变长一点,现在下面还有很多空的")。 */
       padding: 40px 44px 28px;
     }
-    .card.hero.two-col .side { display: flex; flex-direction: column; min-width: 0; }
+    .card.hero.two-col .side { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
     .card.hero.two-col .art-wrap { width: 240px; height: 240px; }
+    /* 300px 只是 JS 算出真实高度前的兜底值——CSS Grid 的 auto 行高是拿"两栏内容各自的
+       固有高度"取最大值来定,歌词一长(几十行),.side 的固有高度会比封面列本身还高,
+       连带把整行网格撑到跟歌词一样高(实测坐实:2026-07-31 测了 40 行长歌词才发现,
+       flex:1/min-height:0 这类纯 CSS 手段都救不了,因为问题出在"行高本身先被撑大了",
+       不是"没伸展到位")。真正的高度匹配交给下面 syncHeroLyricsHeight() 用 JS 量出封面列
+       (.np)的实际渲染高度再显式写回来,配合 ResizeObserver 自动感知标题换行/切换黑胶
+       模式等任何会改变 .np 高度的情况,不需要在每个触发点手动调用。 */
     .card.hero.two-col .lyrics.show { height: 300px; margin-top: 2px; }
     /* .secondary 跟 .hero 是不是两栏无关,宽屏下始终铺满同样的卡片宽度,让历史表格/
        留言输入框/Top10 歌手头像有更多横向空间,不用挤在原来右栏那条窄列里。 */
@@ -322,7 +331,8 @@
   .history-cols span { font-size: 10px; color: #6b7280; letter-spacing: .2px; opacity: .8; }
   .history-cols .hc-dev { flex-shrink: 0; width: 14px; }
   .history-cols .hc-title { flex: 1; min-width: 0; }
-  .history-cols .hc-artist { flex-shrink: 0; width: 34%; }
+  .history-cols .hc-album { flex-shrink: 0; width: 22%; }
+  .history-cols .hc-artist { flex-shrink: 0; width: 20%; }
   .history-cols .hc-count { flex-shrink: 0; width: 40px; text-align: right; }
   /* 历史列表里"今天"和"更早"之间的分界线:靠左小标签 + 向右延伸的细线。 */
   .h-divider { display: flex; align-items: center; gap: 8px; margin: 10px 2px 4px;
@@ -345,8 +355,16 @@
   }
   .history a:hover { background: rgba(255,255,255,.06); }
   .history .h-title { flex: 1; min-width: 0; font-size: 13px; color: #dfe2e7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-artist { flex-shrink: 0; max-width: 34%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .history .h-dev { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--accent-fg, #8a919e); }
+  /* 专辑/歌手列宽度必须跟表头 .hc-album/.hc-artist 用完全一样的写法(width,不是
+     max-width)——之前歌手列用 max-width:34%,同一列每一行会按各自文本长度伸缩,
+     跟表头固定 34% 宽度对不齐;改成 width 后每一行永远是同一个宽度,才能真正对齐。 */
+  .history .h-album { flex-shrink: 0; width: 22%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history .h-artist { flex-shrink: 0; width: 20%; font-size: 12px; color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 固定宽度跟表头 .hc-dev 一致,且 JS 侧(renderHistory)现在每一行都无条件创建这个
+     元素(没有设备信息时留空,不是不创建)——这两点缺一不可:之前"没有设备图标的那一行
+     干脆不生成这个 flex 子项",导致那一行少了一个 flex item,后面的歌名/歌手/次数会
+     整体往左挤,跟有图标的行对不齐。 */
+  .history .h-dev { flex-shrink: 0; width: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-fg, #8a919e); }
   .history .h-dev svg { width: 14px; height: 14px; display: block; }
   /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
   .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: 11px; font-weight: 700; color: var(--accent-fg, #8a919e); font-variant-numeric: tabular-nums; }
@@ -391,12 +409,16 @@
   /* ---- 留言墙(2026-07-12新增):挂在 .side 里、历史列表之后,复用 .history-wrap/.history
      的滚动列表样式。留言内容用 textContent 渲染(见 initComments),天然防 XSS,后端不做
      二次转义(转义后再 textContent 会把 &lt; 这类符号原样显示给所有人看,是错的)。 ---- */
-  /* 留言墙"常驻显示、从不加 hidden"(见 updateLayout() 附近注释),但历史区
-     (.history-wrap)是否可见取决于 moduleConfig——只有历史区真的显示出来时,留言墙
-     才需要顶部分隔线区分"上一块";历史区隐藏时留言墙自己就是 .secondary 里第一个
-     可见模块,不该露出一条上面什么都没有的分隔线。 */
+  /* 留言墙"常驻显示、从不加 hidden"(见 updateLayout() 附近注释),现在排在历史区/
+     Top10歌手之后(2026-07-31 用户要求把 Top10歌手和留言墙调换位置)——它前面有两个
+     可能存在也可能隐藏的模块(历史区看 moduleConfig、Top10歌手看有没有数据),只要
+     其中任意一个可见,留言墙就需要顶部分隔线;两个都隐藏时留言墙自己就是 .secondary
+     里第一个可见模块,不该露出一条上面什么都没有的分隔线。用 :has() 一次性覆盖这
+     两种来源,不用像 .top-artists-wrap 那样只挂在紧邻的上一个兄弟节点上。 */
   .comments-wrap { text-align: left; }
-  .history-wrap:not(.hidden) + .comments-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
+  .secondary:has(.history-wrap:not(.hidden), .top-artists-wrap:not(.hidden)) .comments-wrap {
+    margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08);
+  }
   .comments-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; margin-bottom: 8px; }
   .comments {
     display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px;
@@ -443,7 +465,12 @@
      了:这个面板现在整个挪进了 .secondary 那张独立卡片(跟历史/留言/表情反应/页脚一起),
      不再跟封面/歌词共用同一张卡片的网格,自然也不需要再摆回"左栏"这个位置,单纯跟着
      .secondary 的纵向堆叠顺序走。 ---- */
-  .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); text-align: left; }
+  /* 2026-07-31 起排在历史区(.history-wrap)紧后面(之前是排在留言墙后面)——分隔线
+     只在历史区真的可见时才需要,历史区隐藏时 Top10歌手自己可能就是 .secondary 里
+     第一个可见模块,道理跟 .comments-wrap 那条 :has() 规则一样,只是这里前面只有
+     历史区一个候选,用普通的相邻兄弟选择器就够,不需要 :has()。 */
+  .top-artists-wrap { text-align: left; }
+  .history-wrap:not(.hidden) + .top-artists-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
   .top-artists-wrap.hidden { display: none; }
   .top-artists-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
   .top-artists-title { font-size: 15px; font-weight: 700; letter-spacing: .2px; color: #6b7280; }
@@ -498,6 +525,7 @@
   :root[data-theme="light"] .lrc-w { color: #9aa1ad; }
   :root[data-theme="light"] .bar { background: rgba(0,0,0,.12); }
   :root[data-theme="light"] .history .h-title { color: #2a2e37; }
+  :root[data-theme="light"] .history .h-album,
   :root[data-theme="light"] .history .h-artist { color: #7a828f; }
   :root[data-theme="light"] .history a:hover { background: rgba(0,0,0,.05); }
   :root[data-theme="light"] .ic { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
@@ -506,7 +534,7 @@
   :root[data-theme="light"] .reaction-btn { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
   :root[data-theme="light"] .reaction-btn:hover { background: rgba(0,0,0,.1); }
   :root[data-theme="light"] .r-count { color: #7a828f; }
-  :root[data-theme="light"] .history-wrap:not(.hidden) + .comments-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .secondary:has(.history-wrap:not(.hidden), .top-artists-wrap:not(.hidden)) .comments-wrap { border-top-color: rgba(0,0,0,.1); }
   :root[data-theme="light"] .comments-title,
   :root[data-theme="light"] .comments-empty,
   :root[data-theme="light"] .reactions-hint,
@@ -518,7 +546,7 @@
   :root[data-theme="light"] .comment-text,
   :root[data-theme="light"] .comment-submit { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); color: #1c1f26; }
   :root[data-theme="light"] .comment-submit:hover { background: rgba(0,0,0,.1); }
-  :root[data-theme="light"] .top-artists-wrap { border-top-color: rgba(0,0,0,.1); }
+  :root[data-theme="light"] .history-wrap:not(.hidden) + .top-artists-wrap { border-top-color: rgba(0,0,0,.1); }
   :root[data-theme="light"] .top-artists-title,
   :root[data-theme="light"] .top-artists-updated { color: #7a828f; }
   :root[data-theme="light"] .ta-name { color: #2a2e37; }
@@ -563,7 +591,8 @@
     .lyrics { margin-top: 14px; }
     .lyrics.show { height: 160px; }
     .history { max-height: 220px; }
-    .history-wrap:not(.hidden) + .comments-wrap { margin-top: 16px; padding-top: 14px; }
+    .history-wrap:not(.hidden) + .top-artists-wrap { margin-top: 16px; padding-top: 14px; }
+    .secondary:has(.history-wrap:not(.hidden), .top-artists-wrap:not(.hidden)) .comments-wrap { margin-top: 16px; padding-top: 14px; }
     .comments { max-height: 160px; }
     .meta { margin-top: 16px; }
     /* 工具钮抽屉:小屏幕横排三个圆钮会跟黑胶模式下悬在封面右上方的唱臂图形打架
@@ -647,10 +676,18 @@
     <div class="history-cols">
       <span class="hc-dev"></span>
       <span class="hc-title" data-i18n="colTitle">歌名</span>
+      <span class="hc-album" data-i18n="colAlbum">专辑</span>
       <span class="hc-artist" data-i18n="colArtist">歌手</span>
       <span class="hc-count" data-i18n="col30d">30天</span>
     </div>
     <div id="history" class="history"></div>
+  </div>
+  <div id="top-artists-wrap" class="top-artists-wrap hidden">
+    <div class="top-artists-head">
+      <span class="top-artists-title" data-i18n="topArtists">历史播放 Top10 歌手</span>
+      <span id="top-artists-updated" class="top-artists-updated"></span>
+    </div>
+    <div id="top-artists" class="top-artists"></div>
   </div>
   <div id="comments-wrap" class="comments-wrap">
     <div class="comments-title" data-i18n="comments">留言</div>
@@ -660,13 +697,6 @@
       <input id="comment-text" class="comment-text" type="text" data-i18n-placeholder="textPlaceholder" placeholder="留句话…" maxlength="200" required>
       <button id="comment-submit" class="comment-submit" type="submit" data-i18n="send">发送</button>
     </form>
-  </div>
-  <div id="top-artists-wrap" class="top-artists-wrap hidden">
-    <div class="top-artists-head">
-      <span class="top-artists-title" data-i18n="topArtists">历史播放 Top10 歌手</span>
-      <span id="top-artists-updated" class="top-artists-updated"></span>
-    </div>
-    <div id="top-artists" class="top-artists"></div>
   </div>
   <div class="reactions-footer" id="reactions-footer">
     <div id="reactions" class="reactions"></div>
@@ -708,7 +738,7 @@
       fsToggleTitle: '沉浸 / 全屏模式', fsToggleAria: '沉浸全屏模式',
       themeAuto: '氛围', themeLight: '浅色', themeTitlePrefix: '主题：', themeTitleSuffix: '（点击切换）',
       previewAria: '试听 30 秒', previewTitle: '试听 30 秒（iTunes 预览）',
-      recentPlays: '最近播放', colTitle: '歌名', colArtist: '歌手', col30d: '30天',
+      recentPlays: '最近播放', colTitle: '歌名', colAlbum: '专辑', colArtist: '歌手', col30d: '30天',
       comments: '留言', namePlaceholder: '昵称(可选)', textPlaceholder: '留句话…', send: '发送',
       noComments: '还没有留言,来写第一条吧', anonymous: '匿名',
       topArtists: '历史播放 Top10 歌手', topArtistsUpdated: t => `更新于 · ${t}`,
@@ -739,7 +769,7 @@
       fsToggleTitle: 'Immersive / Fullscreen mode', fsToggleAria: 'Immersive fullscreen mode',
       themeAuto: 'Ambient', themeLight: 'Light', themeTitlePrefix: 'Theme: ', themeTitleSuffix: ' (click to switch)',
       previewAria: '30s Preview', previewTitle: '30-second preview (via iTunes)',
-      recentPlays: 'Recent Plays', colTitle: 'Title', colArtist: 'Artist', col30d: '30d',
+      recentPlays: 'Recent Plays', colTitle: 'Title', colAlbum: 'Album', colArtist: 'Artist', col30d: '30d',
       comments: 'Comments', namePlaceholder: 'Name', textPlaceholder: 'Say something…', send: 'Send',
       noComments: 'No comments yet — be the first!', anonymous: 'Anonymous',
       topArtists: 'Top 10 Artists (All Time)', topArtistsUpdated: t => `Updated · ${t}`,
@@ -1179,11 +1209,16 @@
     if (USER === 'CHANGE_ME') return;
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
+    // ⚠️ album 字段(2026-07-31 新增专辑列)取决于 state-worker 的 /history 响应本身有没有
+    // 回传这个字段——那份代码在另一个仓库(Yudaotor/nowplaying-workers),这次没有检出到本地
+    // 没法确认/改动。这里按 x.album 读,worker 没给就是空字符串,列会显示为空(不报错、
+    // 不影响其它列),不是这边的 bug;直连 LB 兜底那条路径(下面)专辑数据是完整的,因为
+    // 直接从原始 listen 的 release_name 取。
     if (RELAY) {
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
-          const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 }));
+          const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', album: x.album || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 }));
           persistHistory(items);
           renderHistory(items);
           renderTodayStatSmart(d.items);
@@ -1199,7 +1234,7 @@
       // 真正用得到的字段,是本地变量不是要对外暴露的 API 响应,没必要跟那边完全同形状。
       const items = listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
         const m = l.track_metadata, ai = m.additional_info || {};
-        return { title: m.track_name, artist: m.artist_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
+        return { title: m.track_name, artist: m.artist_name || '', album: m.release_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
       });
       persistHistory(items);
       renderHistory(items);
@@ -1356,20 +1391,25 @@
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
+      // .h-dev 现在无条件创建(没有设备信息时留空,不是干脆不生成这个元素)——2026-07-31
+      // 实测坐实:之前"没设备就不生成"会让那一行在 flex 布局里少一个子项,后面的歌名/
+      // 专辑/歌手/次数列整体往左挤,跟有设备图标的行、跟表头都对不上;固定生成一个
+      // 同宽度的空 span 占住这个位置,才能保证每一行的列宽真的对齐。
+      const d = document.createElement('span'); d.className = 'h-dev';
       if (it.device === 'iphone' || it.device === 'mac') {
-        const d = document.createElement('span'); d.className = 'h-dev';
         d.innerHTML = DEV_ICON[it.device]; // 静态可信 SVG,非用户输入
         d.title = it.device === 'iphone' ? 'iPhone' : 'Mac';
-        a.appendChild(d);
       }
+      a.appendChild(d);
       // 这个局部变量不能叫 t——同一个 for 循环体块里上面 t('earlier') 用的是外层 i18n
       // 查找函数,若在这个块内任何位置 const t = ...,整个块从块首开始 t 就会被判成指向
       // 这个块作用域变量(暂时性死区),导致 t('earlier') 在运行到那一行时直接抛
       // ReferenceError(Cannot access 't' before initialization)。
       const titleEl = document.createElement('span'); titleEl.className = 'h-title'; titleEl.textContent = it.title;
+      const albumEl = document.createElement('span'); albumEl.className = 'h-album'; albumEl.textContent = it.album || '';
       const ar = document.createElement('span'); ar.className = 'h-artist'; ar.textContent = it.artist;
       const cnt = document.createElement('span'); cnt.className = 'h-count'; cnt.dataset.key = `${it.artist}|${it.title}`;
-      a.appendChild(titleEl); a.appendChild(ar); a.appendChild(cnt); box.appendChild(a);
+      a.appendChild(titleEl); a.appendChild(albumEl); a.appendChild(ar); a.appendChild(cnt); box.appendChild(a);
     }
     box.scrollTop = prevTop;
     wrap.classList.remove('hidden');
@@ -1518,6 +1558,34 @@
   function updateLayout() {
     const hasLyrics = el('lyrics').classList.contains('show');
     document.querySelector('.card.hero').classList.toggle('two-col', hasLyrics);
+    syncHeroLyricsHeight();
+  }
+  // 两栏模式下让歌词框(#lyrics)的高度精确匹配左边封面列(.np)的实际渲染高度——纯
+  // CSS(grid stretch/flex:1/min-height:0 这几种手段都试过)做不到:CSS Grid 的 auto
+  // 行高本身就是拿两栏各自的固有内容高度取最大值,歌词一长,.side 的固有高度反而会比
+  // .np 还高,把整行网格撑大,不是"没伸展到位"这种能靠 stretch/flex 修的问题(详见
+  // 上面 .lyrics.show 的样式注释)。改成 JS 量出 .np 的真实高度直接写回 #lyrics.style.
+  // height,多出来的歌词内容交给 #lyrics 自己的 overflow-y:auto 滚动,不再撑高卡片。
+  // 单栏模式(没歌词,或窄屏)下清空这个内联样式,让 CSS 的固定 height 断点值(mobile
+  // 160px / 默认 300px)接管——内联样式的优先级比样式表规则高,不清空的话切回单栏后
+  // 歌词框会一直卡在两栏模式算出来的那个高度上。
+  function syncHeroLyricsHeight() {
+    const lyricsEl = el('lyrics');
+    const npEl = document.querySelector('.np');
+    const wide = window.matchMedia('(min-width: 820px)').matches;
+    if (wide && document.querySelector('.card.hero').classList.contains('two-col') && npEl) {
+      lyricsEl.style.height = npEl.offsetHeight + 'px';
+    } else {
+      lyricsEl.style.height = '';
+    }
+  }
+  window.addEventListener('resize', syncHeroLyricsHeight);
+  // ResizeObserver 盯着 .np 本身的渲染高度变化(标题换行成两行/切黑胶模式/字号变化等
+  // 任何会改变它高度的情况),自动重新同步——不需要在每一个可能的触发点手动补一次调用,
+  // 覆盖面比"只在 updateLayout/resize 里调"更完整、也更不容易漏。
+  if (typeof ResizeObserver !== 'undefined') {
+    const npObserveTarget = document.querySelector('.np');
+    if (npObserveTarget) new ResizeObserver(syncHeroLyricsHeight).observe(npObserveTarget);
   }
   function syncLyrics(posMs) {
     if (!lrcLines.length) return;
