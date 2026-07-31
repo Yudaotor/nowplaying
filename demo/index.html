@@ -180,8 +180,12 @@
   @media (prefers-reduced-motion: reduce) { .art-wrap.vinyl .tonearm { transition: none; } }
   .tonearm polyline { fill: none; stroke: #eef0f4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
   .tonearm circle { fill: #eef0f4; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
-  /* 卡片右上角工具钮组(主题/黑胶/沉浸),共享 .tool-btn 样式。 */
-  .tools { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 6px; }
+  /* 卡片右上角工具钮组(主题/黑胶/沉浸),共享 .tool-btn 样式。抽屉收纳(点"⋯"展开竖排
+     三个真正按钮)原来只在窄屏(≤600px)生效、桌面端一直是横排三个常显——2026-07-31
+     用户反馈"这些在电脑端网页也折叠起来吧",改成不分宽窄屏一律收进抽屉,下面
+     max-width:600px 媒体查询里原来专属这一段的规则(.tools-toggle/.tools 方向/按钮
+     显隐)已经全部搬到这里变成全局规则,不再需要窄屏专属覆盖。 */
+  .tools { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   .tool-btn {
     width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;
     border-radius: 50%; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06);
@@ -190,7 +194,9 @@
   }
   .tool-btn:hover { background: rgba(255,255,255,.14); }
   .tool-btn.on { color: var(--accent-fg, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
-  .tools-toggle { display: none; } /* 桌面端不用抽屉,见下方 max-width:600px 里的覆盖 */
+  .tools-toggle { display: flex; }
+  .tools #theme-toggle, .tools #vinyl-toggle, .tools #fs-toggle, .tools #lang-toggle { display: none; }
+  .tools.open #theme-toggle, .tools.open #vinyl-toggle, .tools.open #fs-toggle, .tools.open #lang-toggle { display: flex; }
   .tools-toggle span { display: inline-block; transition: transform .2s ease; }
   .tools-toggle.on span { transform: rotate(90deg); } /* "⋯" 转90°看起来像"⋮",暗示"已展开" */
   .status {
@@ -607,14 +613,6 @@
     .secondary:has(.history-wrap:not(.hidden), .top-artists-wrap:not(.hidden)) .comments-wrap { margin-top: 16px; padding-top: 14px; }
     .comments { max-height: 160px; }
     .meta { margin-top: 16px; }
-    /* 工具钮抽屉:小屏幕横排三个圆钮会跟黑胶模式下悬在封面右上方的唱臂图形打架
-       (实测坐实:2026-07-11)。平时只露一个"⋯"入口,点开才竖着展开三个真正的按钮,
-       收起时视觉体积降到原来的三分之一,不再跟唱臂抢地方。桌面端(>600px)不受影响,
-       维持原来横排常显。 */
-    .tools-toggle { display: flex; }
-    .tools { flex-direction: column; align-items: flex-end; }
-    .tools #theme-toggle, .tools #vinyl-toggle, .tools #fs-toggle, .tools #lang-toggle { display: none; }
-    .tools.open #theme-toggle, .tools.open #vinyl-toggle, .tools.open #fs-toggle, .tools.open #lang-toggle { display: flex; }
   }
   .hidden { display: none !important; }
 </style>
@@ -1898,9 +1896,8 @@
     window.__vinylSpinRefresh = apply; // 黑胶/方形切换后重新评估
   })();
 
-  // 工具钮抽屉(仅小屏幕生效,见 max-width:600px 里的 CSS):点"⋯"展开/收起下面三个
-  // 真正的按钮,再点一次或点抽屉外任意位置收起。桌面端 .tools-toggle 本来就
-  // display:none,这里的开关状态不会影响桌面端观感。
+  // 工具钮抽屉(2026-07-31 起不分宽窄屏一律生效,见 .tools/.tools-toggle 的 CSS):
+  // 点"⋯"展开/收起下面三个真正的按钮,再点一次或点抽屉外任意位置收起。
   (function initToolsDrawer() {
     const wrap = el('tools'), toggle = el('tools-toggle');
     if (!wrap || !toggle) return;
