@@ -1258,15 +1258,33 @@
     }
     return acc;
   }
-  // 近30天每首歌播放次数:中继 /history 最多给 200 条(覆盖不了 30 天),这里独立于历史
-  // 列表本身直接翻页 LB 拿全近30天数据统计——请求链路较慢(最多翻 15 页),缓存 15 分钟,
-  // 不跟着历史列表每 30s 的刷新一起重算(那样会一直在拉全量近30天数据,浪费且慢)。
+  // 近30天每首歌播放次数。2026-07-31 之前这里直接在浏览器里翻页拉 LB(最多15页)统计,
+  // 用户反馈"体感非常慢"——国内直连 LB 本来就慢(这正是整个 relay 存在的理由),还要
+  // 浏览器顺序等每一页依次返回。已经把这份翻页统计挪到 state-worker 的 /month-counts
+  // 端点(服务端算 + KV 缓存15分钟,所有访客共享同一份结果,不用各自重新翻页),这里
+  // 优先读那个快得多的端点;中继不通/没配置 RELAY 时才退回原来这段直连 LB 翻页的兜底
+  // 实现(慢,但至少能算出来)。缓存本身仍然留在客户端 15 分钟,避免每次进历史区都重新
+  // 请求(不管走的是哪条路径)。
   let monthCounts = null, monthCountsAt = 0;
   const MONTH_COUNTS_TTL = 15 * 60 * 1000;
   async function getMonthCounts() {
     const now = Date.now();
     if (monthCounts && now - monthCountsAt < MONTH_COUNTS_TTL) return monthCounts;
     if (USER === 'CHANGE_ME') return new Map();
+    if (RELAY) {
+      try {
+        const d = await fetchJSON(`${RELAY}/month-counts`, 10000);
+        if (d && d.ok && d.counts) {
+          monthCounts = new Map(Object.entries(d.counts));
+          // d.stale:relay 那边缓存刚好过期/从没算过,后台正在算但这次先给了旧值/空值——
+          // 不锁定 15 分钟长缓存,故意不更新 monthCountsAt(留在很早以前,判定成"已过期"),
+          // 这样下一轮历史列表 30s 自动刷新就会重新问一次,而不是让这个用户这一整个 15
+          // 分钟会话都卡在空的"30天"数字上(那时后台大概率已经算完了)。
+          if (!d.stale) monthCountsAt = now;
+          return monthCounts;
+        }
+      } catch (e) { /* 中继不通 → 下面直连 LB 翻页兜底 */ }
+    }
     const cutoff = Math.floor((now - 30 * 86400000) / 1000);
     const counts = new Map();
     let maxTs = null;
