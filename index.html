@@ -74,12 +74,14 @@
   .glow {
     position: fixed; inset: -20%; z-index: 0; pointer-events: none; opacity: 0;
     /* 2026-08-04 按 Apple Music 歌词页(以及已经先改过去的"歌词窗口")重调:AM 的背景
-       是亮而饱和的——饱和度拉到 1.5、只压一层均匀的 22% 黑,不再叠原来那圈"边缘全黑"
+       是亮而饱和的——饱和度拉到 1.5、只压一层均匀的黑,不再叠原来那圈"边缘全黑"
        的重暗角(radial-gradient 到 100% accent 混黑)+brightness(.62) 的暗色调组合。
        均匀的半透明黑放在同一元素的第一层 background-image 里一起被 blur 也没关系——
-       纯色被模糊后还是那个纯色。 */
+       纯色被模糊后还是那个纯色。压暗系数不是定值:--art-scrim 由 computeArtScrim()
+       按封面平均亮度现算(浅封面压得重、深封面压得轻,对照 AM 实测取样得出的规律),
+       读不出像素时吃这里的 0.30 默认档。 */
     background-image:
-      linear-gradient(rgba(0,0,0,.22), rgba(0,0,0,.22)),
+      linear-gradient(rgba(0,0,0,var(--art-scrim,.3)), rgba(0,0,0,var(--art-scrim,.3))),
       var(--art-url, none);
     background-size: cover;
     background-position: center;
@@ -116,6 +118,22 @@
     text-align: center;
     transition: opacity .35s ease, background .8s ease;
   }
+  /* 有封面模糊背景(data-art-bg,setArtBlur 维护)时,hero 卡片把自己的深色底/染色
+     整层撤掉,让内容直接躺在 .glow 的模糊封面上——Apple Music 歌词页就是一整面无
+     卡片的模糊封面(2026-08-04 实测对照坐实:原来那层 58% 深蓝灰+accent 16% 染色叠
+     在背景上,把整块区域拉得又暗又饱和,是网页背景跟 AM 对不齐的主因)。浅色主题
+     不适用——那边 .glow 本来就被关掉(见上面 .glow 的浅色规则),卡片必须保留自己的
+     浅色底。文字亮度也顺着背景变亮补一档(跟歌词的白色系同一思路)。 */
+  :root[data-art-bg]:not([data-theme="light"]) .card.hero {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgba(255,255,255,.05);
+    box-shadow: none;
+  }
+  :root[data-art-bg]:not([data-theme="light"]) .card.hero .artist { color: rgba(255,255,255,.86); }
+  :root[data-art-bg]:not([data-theme="light"]) .card.hero .album,
+  :root[data-art-bg]:not([data-theme="light"]) .card.hero .times { color: rgba(255,255,255,.6); }
   /* 宽屏(≥820px)且有歌词时,.hero 横向铺成两栏:左=封面/正在播放,右=歌词,左右对齐。
      没歌词就维持单栏(封面居中),因为已经没有别的东西可以跟封面并排了——历史/留言/
      Top10歌手/表情反应/页脚这些跟"当下播放"关系不大的模块,2026-07-31 起拆到下面
@@ -1240,8 +1258,14 @@
   function setArtBlur(url) {
     if (url === lastArtBlurUrl) return;
     lastArtBlurUrl = url;
+    // data-art-bg:标记"当前有封面模糊背景"——hero 卡片据此把自己的深色底/backdrop
+    // 染色整层撤掉(见 CSS :root[data-art-bg] 规则),让歌词区直接躺在模糊封面上,跟
+    // Apple Music 歌词页一致(实测对照坐实:卡片那层 58% 深蓝灰+accent 金染色是网页
+    // 背景比 AM 又暗又饱和的主因,光调 .glow 的滤镜参数怎么都对不齐)。
+    document.documentElement.toggleAttribute('data-art-bg', !!url);
     if (!url) {
       el('glow-a').classList.remove('on'); el('glow-b').classList.remove('on');
+      document.documentElement.style.removeProperty('--art-scrim');
       return;
     }
     const next = el(glowOn ? 'glow-a' : 'glow-b'), prev = el(glowOn ? 'glow-b' : 'glow-a');
@@ -1249,6 +1273,34 @@
     next.classList.add('on');
     prev.classList.remove('on');
     glowOn = glowOn ? 0 : 1;
+    computeArtScrim(url);
+  }
+
+  // 按封面自身的平均亮度自适应压暗背景——对照 Apple Music 两类封面的实测取样:浅色
+  // 封面(平均亮度高)它压得重(B≈0.50),深色饱和封面压得轻(B≈0.58),固定一档遮罩
+  // 无法两头都对齐。压暗系数 = 0.12 + 0.36×平均亮度,夹在 [0.18, 0.40]。跨域封面
+  // (网易云/QQ CDN)读不出像素(canvas 被 CORS 污染)时静默退回 CSS 默认档(0.30),
+  // 不影响背景本身的显示。
+  function computeArtScrim(url) {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 8;
+        const g = c.getContext('2d');
+        g.drawImage(im, 0, 0, 8, 8);
+        const d = g.getImageData(0, 0, 8, 8).data;
+        let lum = 0;
+        for (let i = 0; i < d.length; i += 4) lum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        lum /= (d.length / 4) * 255;
+        const scrim = Math.min(.40, Math.max(.18, .12 + .36 * lum));
+        document.documentElement.style.setProperty('--art-scrim', scrim.toFixed(3));
+      } catch (e) {
+        document.documentElement.style.removeProperty('--art-scrim');
+      }
+    };
+    im.onerror = () => document.documentElement.style.removeProperty('--art-scrim');
+    im.src = url;
   }
 
   // 首屏显示的是本地缓存的上一首：置灰 + 状态显示“更新中…”，拉到实时数据后由 clear 恢复。
