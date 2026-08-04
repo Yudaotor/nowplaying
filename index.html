@@ -118,13 +118,14 @@
     text-align: center;
     transition: opacity .35s ease, background .8s ease;
   }
-  /* 有封面模糊背景(data-art-bg,setArtBlur 维护)时,hero 卡片把自己的深色底/染色
-     整层撤掉,让内容直接躺在 .glow 的模糊封面上——Apple Music 歌词页就是一整面无
-     卡片的模糊封面(2026-08-04 实测对照坐实:原来那层 58% 深蓝灰+accent 16% 染色叠
-     在背景上,把整块区域拉得又暗又饱和,是网页背景跟 AM 对不齐的主因)。浅色主题
-     不适用——那边 .glow 本来就被关掉(见上面 .glow 的浅色规则),卡片必须保留自己的
-     浅色底。文字亮度也顺着背景变亮补一档(跟歌词的白色系同一思路)。 */
-  :root[data-art-bg]:not([data-theme="light"]) .card.hero {
+  /* 有封面模糊背景(data-art-bg,setArtBlur 维护)时,两张卡片(.hero/.secondary)把
+     自己的深色底/染色整层撤掉,让内容直接躺在 .glow 的模糊封面上——Apple Music 歌词页
+     就是一整面无卡片的模糊封面(2026-08-04 实测对照坐实:原来那层 58% 深蓝灰+accent
+     16% 染色叠在背景上,把整块区域拉得又暗又饱和,是网页背景跟 AM 对不齐的主因;
+     hero 先改的,同日用户要求"最近播放和下面的"也统一成这样,.secondary 跟进)。
+     浅色主题不适用——那边 .glow 本来就被关掉(见上面 .glow 的浅色规则),卡片必须
+     保留自己的浅色底。文字亮度也顺着背景变亮补一档(跟歌词的白色系同一思路)。 */
+  :root[data-art-bg]:not([data-theme="light"]) .card {
     background: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -134,6 +135,30 @@
   :root[data-art-bg]:not([data-theme="light"]) .card.hero .artist { color: rgba(255,255,255,.86); }
   :root[data-art-bg]:not([data-theme="light"]) .card.hero .album,
   :root[data-art-bg]:not([data-theme="light"]) .card.hero .times { color: rgba(255,255,255,.6); }
+  /* .secondary 里的文字同样换成白色系——原来的灰阶(#6b7280 一类)是配深色卡片底调的,
+     没了那层深底、直接躺在 B≈0.5 的模糊封面上会几乎看不清。映射关系:小标题/说明类
+     (#6b7280)→ 白 55%,主内容(#dfe2e7)→ 白 92%,次要列(#7b8290)→ 白 62%,
+     名字类(#c8cdd6)→ 白 80%。accent 系(.h-count/.today-stat/.h-dev)不动——那是
+     按当前歌关键色染的高亮,hero 的进度条同样保留着。 */
+  :root[data-art-bg]:not([data-theme="light"]) .history-title,
+  :root[data-art-bg]:not([data-theme="light"]) .history-cols span,
+  :root[data-art-bg]:not([data-theme="light"]) .h-divider,
+  :root[data-art-bg]:not([data-theme="light"]) .comments-title,
+  :root[data-art-bg]:not([data-theme="light"]) .top-artists-title,
+  :root[data-art-bg]:not([data-theme="light"]) .comments-empty,
+  :root[data-art-bg]:not([data-theme="light"]) .c-time,
+  :root[data-art-bg]:not([data-theme="light"]) .visitor-count,
+  :root[data-art-bg]:not([data-theme="light"]) .meta { color: rgba(255,255,255,.55); }
+  :root[data-art-bg]:not([data-theme="light"]) .meta a { color: rgba(255,255,255,.72); }
+  :root[data-art-bg]:not([data-theme="light"]) .history .h-title,
+  :root[data-art-bg]:not([data-theme="light"]) .c-text { color: rgba(255,255,255,.92); }
+  :root[data-art-bg]:not([data-theme="light"]) .history .h-album,
+  :root[data-art-bg]:not([data-theme="light"]) .history .h-artist { color: rgba(255,255,255,.62); }
+  :root[data-art-bg]:not([data-theme="light"]) .c-name,
+  :root[data-art-bg]:not([data-theme="light"]) .ta-name { color: rgba(255,255,255,.8); }
+  :root[data-art-bg]:not([data-theme="light"]) .r-count { color: rgba(255,255,255,.65); }
+  :root[data-art-bg]:not([data-theme="light"]) .comment-name-input::placeholder,
+  :root[data-art-bg]:not([data-theme="light"]) .comment-text::placeholder { color: rgba(255,255,255,.5); }
   /* 宽屏(≥820px)且有歌词时,.hero 横向铺成两栏:左=封面/正在播放,右=歌词,左右对齐。
      没歌词就维持单栏(封面居中),因为已经没有别的东西可以跟封面并排了——历史/留言/
      Top10歌手/表情反应/页脚这些跟"当下播放"关系不大的模块,2026-07-31 起拆到下面
