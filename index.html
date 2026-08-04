@@ -441,6 +441,22 @@
      "刚好唱到这个词最前一刻"变成同一个值,过渡带因此在每个未唱到的词开头都露出一小截
      不该有的高亮(英文按整词分词,这一小截接近首字母宽度,表现成"提前加载颜色";desktop-
      lyrics(Swift)那边同一个 bug 已经修过,见其 LyricsOverlayView.swift 的 wordGradient)。 */
+  /* 暂停/上次播放等"没有播放位置可对齐"的静态歌词(#lyrics 挂 .no-active,由
+     syncLyrics 维护):没有当前行,整片按统一的轻淡显示,不吃距离虚化——全部行都按
+     "远"处理会整片糊掉,静态浏览场景要的是能读、能手动滚。 */
+  .lyrics.no-active .lrc-line { opacity: .62; filter: none; }
+  /* 歌词占位:只在宽屏两栏模式下显示——窄屏本来就是纵向堆叠,没有"右栏塌陷"的问题,
+     多显示一块占位反而是噪音。颜色跟没有封面背景的深色底也兼容(白 50% 两种底都可读),
+     浅色主题单独覆盖。 */
+  .lyrics-empty { display: none; color: rgba(255,255,255,.5); }
+  @media (min-width: 820px) {
+    .card.hero.two-col .lyrics-empty:not(.hidden) {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    }
+  }
+  .lyrics-empty .le-icon { font-size: 42px; opacity: .75; }
+  .lyrics-empty .le-text { font-size: var(--fs-caption); font-weight: 600; letter-spacing: .3px; }
+  :root[data-theme="light"] .lyrics-empty { color: #7a828f; }
   .lrc-w { color: #fff; }
   /* 逐字填色改成 Apple Music 同款"白 35% → 全白"的同色渐变(2026-08-04,原来是
      accent-fg → 灰),跟原生"歌词窗口"的 WordKaraokeGradient 同一组参数。 */
@@ -816,6 +832,9 @@
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
   <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
+  <!-- 有曲目但没有任何同步歌词时的右栏占位(2026-08-04):撑住两栏布局,让 hero 卡片
+       不因为"没歌词"塌回窄的单栏。只在宽屏两栏模式下显示,见 .lyrics-empty 样式注释。 -->
+  <div id="lyrics-empty" class="lyrics-empty hidden"><div class="le-icon">♪</div><div class="le-text" data-i18n="noSyncedLyrics">暂无同步歌词</div></div>
   </div><!-- /.side -->
 </main>
 <!-- 2026-07-31 起,封面+歌词(上面 .hero)和其它模块拆成两个独立的矩形卡片——.hero 只
@@ -907,6 +926,7 @@
       todayStat: (count, dur) => `今日 · ${count} 首 · ${dur}`,
       earlier: '更早',
       nothingPlaying: '暂无播放', quietRightNow: '这会儿很安静',
+      noSyncedLyrics: '暂无同步歌词',
       notConfigured: '页面未配置：URL 需带 ?user=<ListenBrainz用户名>',
       noListensYet: '还没有任何收听记录',
       connectingRetry: '连接中…稍后自动重试', connecting: '连接中…',
@@ -938,6 +958,7 @@
       todayStat: (count, dur) => `Today · ${count} tracks · ${dur}`,
       earlier: 'Earlier',
       nothingPlaying: 'Nothing playing', quietRightNow: "It's quiet right now",
+      noSyncedLyrics: 'No synced lyrics',
       notConfigured: 'Page not configured: URL needs ?user=<ListenBrainz username>',
       noListensYet: 'No listening history yet',
       connectingRetry: 'Connecting… will retry automatically', connecting: 'Connecting…',
@@ -1729,10 +1750,10 @@
     for (const it of arr) { const d = Math.abs(it.t - t); if (d <= bestD) { bestD = d; best = it.text; } }
     return best;
   }
-  function setLyrics(s, playing, sameTrack) {
-    const wrap = el('lyrics'), inner = el('lyrics-inner');
+  function setLyrics(s, syncable, sameTrack) {
+    const wrap = el('lyrics'), inner = el('lyrics-inner'), empty = el('lyrics-empty');
     let show = false;
-    if (playing && s) { // 只在播放时显示(才可同步)
+    if (s) { // 2026-08-04 起有曲目就构建/保留歌词——暂停/无进度数据也照样显示,只是不滚动
       if (!sameTrack || !lrcLines.length) {
         const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
         const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
@@ -1755,16 +1776,28 @@
         });
       }
       show = lrcLines.length > 0;
+    } else {
+      inner.textContent = ''; lrcLines = []; lrcActive = -1;
     }
     wrap.classList.toggle('show', show);
+    if (show && !syncable) {
+      // 播放位置不再前进(暂停/无进度数据),frame() 里的 syncLyrics 不会跑,这里主动
+      // 对齐一次:暂停时按冻结的 progressMs 高亮到暂停那一行(逐字填色也停在半截,跟
+      // Apple Music 暂停时一致);完全没有进度数据(iPhone 桥接、"上次播放"兜底)传 -1,
+      // 匹配不到任何行 → syncLyrics 给 #lyrics 挂 .no-active,整片轻淡静态展示。
+      syncLyrics(typeof s.progressMs === 'number' && s.progressMs > 0 ? s.progressMs : -1);
+    }
+    // 有曲目但没有任何歌词 → 右栏占位,让 hero 卡片保持两栏大小(用户点名:暂停/没歌词
+    // 时卡片不该塌回窄单栏)。没有曲目(页面空闲态)两个都不显示,回到单栏。
+    empty.classList.toggle('hidden', !(s && !show));
     updateLayout();
   }
-  // 2026-07-31 起 .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏只看有没有
-  // 歌词——历史/留言墙/Top10歌手已经拆到 .secondary 那张独立卡片里(见旁边 HTML/CSS
-  // 注释),不再参与这个判断,.secondary 在宽屏下始终铺满卡片宽度,不需要 JS 干预。
+  // 2026-07-31 起 .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏看右栏有没有
+  // 内容(歌词或"暂无歌词"占位)——历史/留言墙/Top10歌手已经拆到 .secondary 那张独立
+  // 卡片里(见旁边 HTML/CSS 注释),不再参与这个判断。
   function updateLayout() {
-    const hasLyrics = el('lyrics').classList.contains('show');
-    document.querySelector('.card.hero').classList.toggle('two-col', hasLyrics);
+    const hasPane = el('lyrics').classList.contains('show') || !el('lyrics-empty').classList.contains('hidden');
+    document.querySelector('.card.hero').classList.toggle('two-col', hasPane);
     syncHeroLyricsHeight();
   }
   // 两栏模式下让歌词框(#lyrics)的高度精确匹配左边封面列(.np)的实际渲染高度——纯
@@ -1786,10 +1819,14 @@
     // 的优先级天生高于任何 class 选择器,会无条件盖掉沉浸模式那几条 vh 规则——显式清空
     // 交还控制权给 CSS,跟单栏/窄屏那个 else 分支同一个道理。
     const immersive = document.documentElement.hasAttribute('data-immersive');
+    const emptyEl = el('lyrics-empty');
     if (wide && !immersive && document.querySelector('.card.hero').classList.contains('two-col') && npEl) {
       lyricsEl.style.height = npEl.offsetHeight + 'px';
+      // "暂无歌词"占位跟歌词框吃同一个高度,右栏在两种内容下撑出的卡片尺寸一致。
+      emptyEl.style.height = npEl.offsetHeight + 'px';
     } else {
       lyricsEl.style.height = '';
+      emptyEl.style.height = '';
     }
   }
   window.addEventListener('resize', syncHeroLyricsHeight);
@@ -1804,6 +1841,10 @@
     if (!lrcLines.length) return;
     let idx = -1;
     for (let i = 0; i < lrcLines.length && lrcLines[i].t <= posMs; i++) idx = i;
+    // 没有任何行匹配(还没到第一句/暂停时没有进度数据)→ 整片轻淡静态展示,见
+    // .lyrics.no-active 样式注释。先比较再写,避免 rAF 每帧都碰 DOM attribute。
+    const wrapEl = el('lyrics');
+    if (wrapEl.classList.contains('no-active') !== (idx < 0)) wrapEl.classList.toggle('no-active', idx < 0);
     if (idx !== lrcActive) {
       // Apple Music 式按距离连续衰减的景深(2026-08-04,配合 CSS .lrc-line 的 --d
       // 变量):只维护新旧 active ±LRC_DEPTH 范围内每行的 --d,不用扫全表——超出这个
