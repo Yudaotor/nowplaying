@@ -1795,6 +1795,19 @@
     // 时卡片不该塌回窄单栏)。没有曲目(页面空闲态)两个都不显示,回到单栏。
     empty.classList.toggle('hidden', !(s && !show));
     updateLayout();
+    // 布局落定之后再定位一次,而且用 instant——2026-08-05 用户反馈"暂停时刷新进去,歌词
+    // 停在最上方而不是暂停那一行"的根因就在这里,两个问题叠在一起:
+    // ① 上面 syncLyrics 里的 lrcScrollActive 跑在 updateLayout() **之前**,那时 .two-col
+    //    还没加上、#lyrics 也还没被 syncHeroLyricsHeight 写上真实高度,吃的是 .lyrics 基础
+    //    规则那 132px,按它算出来的目标位置跟最终高度差一大截;
+    // ② 那次用的是 smooth,滚动动画刚起步就被紧随其后的高度变更打断,scrollTop 停在 0。
+    // 而暂停时**没有任何后续通路会纠正它**:frame() 里的 syncLyrics 挂在 if (pb) 下面,
+    // 而 pb 的成立条件(setProgress 里 s.playing && durationMs>0 && progressTs)跟这里的
+    // syncable 完全一样——暂停时 pb 恒为 null、rAF 那条线根本不跑,所以这一次就是唯一机会。
+    // 播放中不受影响也正是这个原因:那时靠 rAF 持续定位,布局早就落定了。
+    // 用 instant 而不是 smooth 也更符合预期:开页就该直接停在那一行,不该让用户看着它从
+    // 头一路滚过去。
+    if (show && !syncable && !lrcUserScrolling) lrcScrollActive(false);
   }
   // 2026-07-31 起 .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏看右栏有没有
   // 内容(歌词或"暂无歌词"占位)——历史/留言墙/Top10歌手已经拆到 .secondary 那张独立
@@ -1832,6 +1845,20 @@
       lyricsEl.style.height = '';
       emptyEl.style.height = '';
     }
+    // #lyrics 的高度变了,"当前行落在视口偏上 38%"这个目标位置就跟着变。播放中无所谓
+    // (rAF 每帧都在重新定位),但静态展示(暂停/无进度数据)下 rAF 那条线不跑,必须在这里
+    // 补一次——否则封面列高度后来才变化的那些情况(标题换行成两行、切黑胶模式、改字号、
+    // 窗口缩放)都会让暂停时的歌词偏离当前行。判据用 !pb,跟 frame() 里驱动 syncLyrics
+    // 的条件是同一个。
+    //
+    // ⚠️ 必须推到下一帧再读 pb / lrcUserScrolling,不能就地读:这个函数会被 updateLayout()
+    // 在脚本顶层那句同步的 applyModuleVisibility() 里调到,而那句排在 pb(let,声明于
+    // frame() 上方)和 lrcUserScrolling(let,声明于歌词区上方)两个 let 声明**之前**——
+    // 就地读会落进 TDZ 抛 ReferenceError,把整页脚本直接打死。rAF 回调执行时整份脚本
+    // 早已求值完毕,不存在这个问题。
+    requestAnimationFrame(() => {
+      if (!pb && lyricsEl.classList.contains('show') && !lrcUserScrolling) lrcScrollActive(false);
+    });
   }
   window.addEventListener('resize', syncHeroLyricsHeight);
   // ResizeObserver 盯着 .np 本身的渲染高度变化(标题换行成两行/切黑胶模式/字号变化等
