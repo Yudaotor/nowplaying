@@ -1541,9 +1541,48 @@
   // 请求(不管走的是哪条路径)。
   let monthCounts = null, monthCountsAt = 0;
   const MONTH_COUNTS_TTL = 15 * 60 * 1000;
+
+  // 历史列表走 Last.fm 时,次数也必须走 Last.fm。徽章是按 `歌手|歌名` **精确匹配**贴回
+  // 行上的(见 applyMonthCounts),两边来源不同就会因为拼写差异静默匹配失败 —— 实测混用
+  // 时 200 行里 44 行对不上键,其中 17 行本该显示 ×3 却变成空白(Last.fm 存"周杰倫"、
+  // LB 存"周杰伦"),表现出来像"明明听了 3 次却没统计",比"名字写法不同"更容易被当成 bug。
+  // 同源之后实测 136/136 全部命中。
+  //
+  // 用 user.getTopTracks(period=1month) 而不是像 LB 那条路那样翻页数 —— 它直接返回每首歌
+  // 的 playcount,**一个请求**就够(实测 747 首、totalPages=1),LB 那边要顺序翻十几页。
+  // period 是 Last.fm 自己的滚动窗口(约 30 天),跟列名「30天」不是逐日严格对齐,但这一列
+  // 的用途是"这首最近是不是在反复听",这个精度足够。
+  async function fetchLastfmMonthCounts() {
+    const counts = new Map();
+    // 上限 3 页(3000 首)兜底防跑飞 —— 正常一个月的不同曲目远到不了 1000。
+    for (let page = 1; page <= 3; page++) {
+      const q = new URLSearchParams({
+        method: 'user.getTopTracks', user: LFM_USER, api_key: LFM_KEY,
+        format: 'json', period: '1month', limit: '1000', page: String(page),
+      });
+      const d = await fetchJSON(`${LFM}?${q}`, 12000);
+      const tt = (d && d.toptracks) || {};
+      const raw = tt.track || [];
+      // 只有一条时 Last.fm 返回对象而不是数组,跟 getrecenttracks 同一个毛病。
+      for (const t of (Array.isArray(raw) ? raw : [raw])) {
+        const n = Number((t && t.playcount) || 0);
+        if (t && t.name && n) counts.set(`${(t.artist && t.artist.name) || ''}|${t.name}`, n);
+      }
+      if (page >= Number((tt['@attr'] || {}).totalPages || 1)) break;
+    }
+    return counts.size ? counts : null;
+  }
+
   async function getMonthCounts() {
     const now = Date.now();
     if (monthCounts && now - monthCountsAt < MONTH_COUNTS_TTL) return monthCounts;
+    if (lastfmHistoryOn()) {
+      try {
+        const c = await fetchLastfmMonthCounts();
+        if (c) { monthCounts = c; monthCountsAt = now; return monthCounts; }
+      } catch (e) { /* Last.fm 不通 → 落到下面 LB 那条路,拼写对不上的那些行会没有徽章,
+                       但 78% 有总比整列空白强 */ }
+    }
     if (USER === 'CHANGE_ME') return new Map();
     if (RELAY) {
       try {
