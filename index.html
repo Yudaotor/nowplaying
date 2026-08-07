@@ -138,7 +138,7 @@
   /* .secondary 里的文字同样换成白色系——原来的灰阶(#6b7280 一类)是配深色卡片底调的,
      没了那层深底、直接躺在 B≈0.5 的模糊封面上会几乎看不清。映射关系:小标题/说明类
      (#6b7280)→ 白 55%,主内容(#dfe2e7)→ 白 92%,次要列(#7b8290)→ 白 62%,
-     名字类(#c8cdd6)→ 白 80%。accent 系(.h-count/.today-stat/.h-dev)不动——那是
+     名字类(#c8cdd6)→ 白 80%。accent 系(.h-count/.today-stat)不动——那是
      按当前歌关键色染的高亮,hero 的进度条同样保留着。 */
   :root[data-art-bg]:not([data-theme="light"]) .history-title,
   :root[data-art-bg]:not([data-theme="light"]) .history-cols span,
@@ -495,10 +495,9 @@
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
   .history-title { font-size: var(--fs-label); font-weight: 700; letter-spacing: .2px; color: #6b7280; }
   /* "近30天播放"列名:右对齐,跟每行 .h-count 徽章对齐,说明那个数字列是什么意思。 */
-  /* 列名跟下面每行的 .h-dev/.h-title/.h-artist/.h-count 一一对齐:占位宽度用同一套数字。 */
+  /* 列名跟下面每行的 .h-title/.h-artist/.h-count 一一对齐:占位宽度用同一套数字。 */
   .history-cols { display: flex; align-items: baseline; gap: 10px; padding: 0 8px 4px; }
   .history-cols span { font-size: var(--fs-micro); color: #6b7280; letter-spacing: .2px; opacity: .8; }
-  .history-cols .hc-dev { flex-shrink: 0; width: 14px; }
   .history-cols .hc-title { flex: 1; min-width: 0; }
   .history-cols .hc-album { flex-shrink: 0; width: 22%; }
   .history-cols .hc-artist { flex-shrink: 0; width: 20%; }
@@ -529,12 +528,6 @@
      跟表头固定 34% 宽度对不齐;改成 width 后每一行永远是同一个宽度,才能真正对齐。 */
   .history .h-album { flex-shrink: 0; width: 22%; font-size: var(--fs-caption); color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .history .h-artist { flex-shrink: 0; width: 20%; font-size: var(--fs-caption); color: #7b8290; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* 固定宽度跟表头 .hc-dev 一致,且 JS 侧(renderHistory)现在每一行都无条件创建这个
-     元素(没有设备信息时留空,不是不创建)——这两点缺一不可:之前"没有设备图标的那一行
-     干脆不生成这个 flex 子项",导致那一行少了一个 flex item,后面的歌名/歌手/次数会
-     整体往左挤,跟有图标的行对不齐。 */
-  .history .h-dev { flex-shrink: 0; width: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--accent-fg, #8a919e); }
-  .history .h-dev svg { width: 14px; height: 14px; display: block; }
   /* 近30天播放次数:只在 ≥2 次时才显示(=1 次没有信息量,留白更干净)。 */
   .history .h-count { flex-shrink: 0; width: 40px; text-align: right; font-size: var(--fs-micro); font-weight: 700; color: var(--accent-fg, #8a919e); font-variant-numeric: tabular-nums; }
   .meta { margin-top: 24px; font-size: var(--fs-caption); color: #6b7280; }
@@ -853,7 +846,6 @@
       <span id="today-stat" class="today-stat"></span>
     </div>
     <div class="history-cols">
-      <span class="hc-dev"></span>
       <span class="hc-title" data-i18n="colTitle">歌名</span>
       <span class="hc-album" data-i18n="colAlbum">专辑</span>
       <span class="hc-artist" data-i18n="colArtist">歌手</span>
@@ -893,6 +885,32 @@
   // 主数据源:自建状态中继(Cloudflare Worker+KV,采集器直推,国内可达且不受 LB 抽风影响)。
   // 读 /now(当前)+ /history(历史)。可 ?relay= 覆盖;设 ?relay=off 则退回直连 LB。
   const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || 'https://np.yudaotor.me'; })();
+  // 最近播放列表改读 Last.fm(2026-08-07)。只有这一块换源 —— 正在播放/进度条/歌词、
+  // 今日统计、月度日历仍旧读 ListenBrainz,那边有 Last.fm 给不了的东西(播放位置、
+  // additional_info 里的时长)。
+  //
+  // 换源换掉的两样东西是明知代价、已确认接受的:
+  //   1. 行内跳转从 Apple Music / 网易云 / QQ 改成跳 Last.fm 自己的曲目页。前者来自
+  //      采集器写进 LB additional_info 的自定义字段,Last.fm 的数据模型里没有这个位置。
+  //   2. Mac / iPhone 设备图标整列去掉 —— 同样是 additional_info.source,Last.fm 不区分
+  //      scrobble 来自哪台设备。
+  // 还有一样不是代价而是事实:两边对同一次播放的元数据拼写可能不同(实测 LB 存"周杰伦"、
+  // Last.fm 存"周杰倫"),所以历史列表里的歌手名可能跟 Top10 歌手/正在播放不完全一致。
+  //
+  // LFM_KEY 是**专供这个页面**的只读 key,跟采集器桥接用的读 key、scrobble 用的写 key
+  // 都不是同一个 —— 页面是公开静态托管,key 必然明文可见,单独一个的话就算被人蹭配额
+  // 甚至被 Last.fm 吊销,App 那两条链路一点不受影响。只读 key 拿不到任何写权限:
+  // scrobble/删记录/love 都要 api_sig(用 api_secret 签名)+ sk,两者都只在本机。
+  const LFM = 'https://ws.audioscrobbler.com/2.0/';
+  // 这两个都内嵌:线上分享出去的链接是固定的 ?user=<LB用户名>,不可能再要求带 Last.fm
+  // 参数。URL 参数只留作覆盖(本地调试、或 fork 的人临时试)。
+  const LFM_KEY = params.get('lfmkey') || 'CHANGE_ME_LASTFM_API_KEY';
+  const LFM_USER = params.get('lfm') || 'CHANGE_ME_LASTFM_USER';
+  // 两个占位符任一没换掉就整块退回 LB —— 这个页面同时是给别人 fork 的模板,
+  // 不能因为对方没配 Last.fm 就少一块历史。
+  const lastfmHistoryOn = () =>
+    LFM_USER !== '' && LFM_USER !== 'CHANGE_ME_LASTFM_USER' &&
+    LFM_KEY !== '' && LFM_KEY !== 'CHANGE_ME_LASTFM_API_KEY';
 
   const el = id => document.getElementById(id);
 
@@ -1416,9 +1434,47 @@
 
   // 最近播放历史条:LB 已完成的 listen(现含 iPhone),去重取带封面的前几首,
   // 缩略图可点(跳该歌的 Apple/网易云)。每 30s 刷一次。
+  // 从 Last.fm 取最近播放。成功返回 true —— 调用方据此跳过 LB 那边的历史渲染,
+  // 但**不**跳过统计/日历,那两块仍旧读 LB(见 LFM_KEY 附近的注释)。
+  // 失败一律返回 false 让 LB 兜底:少一块历史比空着强,而且这是纯展示,退化没有代价。
+  async function fetchLastfmHistory() {
+    if (!lastfmHistoryOn()) return false;
+    try {
+      const q = new URLSearchParams({
+        method: 'user.getrecenttracks', user: LFM_USER, api_key: LFM_KEY,
+        format: 'json', limit: '200',
+      });
+      const d = await fetchJSON(`${LFM}?${q}`, 10000);
+      // 只有一条结果时 Last.fm 返回的是对象而不是数组 —— 这是它 JSON 接口的老毛病,
+      // 不归一化的话 .filter 直接抛。
+      const raw = (d && d.recenttracks && d.recenttracks.track) || [];
+      const tracks = Array.isArray(raw) ? raw : [raw];
+      const items = tracks
+        // 正在播放那条带 @attr.nowplaying、没有 date —— 它属于"正在播放"那块(仍读 LB),
+        // 混进历史会变成一条时间戳为 0 的幽灵行,排到列表最末尾。
+        .filter(t => t && !(t['@attr'] && t['@attr'].nowplaying))
+        .map(t => ({
+          title: t.name || '',
+          artist: (t.artist && t.artist['#text']) || '',
+          album: (t.album && t.album['#text']) || '',
+          url: t.url || '', // Last.fm 自己的曲目页
+          listenedAt: Number((t.date && t.date.uts) || 0),
+        }))
+        .filter(x => x.title && x.listenedAt);
+      if (!items.length) return false;
+      persistHistory(items);
+      renderHistory(items);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async function fetchHistory() {
     if (!moduleConfig.history) { el('history-wrap').classList.add('hidden'); updateLayout(); return; }
     if (USER === 'CHANGE_ME') return;
+    // 历史列表先试 Last.fm;成功了下面两条 LB 路径就只负责统计和日历。
+    const lfmDone = await fetchLastfmHistory();
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
     // album 字段(2026-07-31 新增专辑列)由 state-worker(另一个仓库 Yudaotor/
@@ -1429,9 +1485,11 @@
       try {
         const d = await fetchJSON(`${RELAY}/history`, 8000);
         if (d && d.ok && Array.isArray(d.items) && d.items.length) {
-          const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', album: x.album || '', url: x.url || '', device: x.device || '', listenedAt: x.listenedAt || 0 }));
-          persistHistory(items);
-          renderHistory(items);
+          if (!lfmDone) {
+            const items = d.items.map(x => ({ title: x.title, artist: x.artist || '', album: x.album || '', url: x.url || '', listenedAt: x.listenedAt || 0 }));
+            persistHistory(items);
+            renderHistory(items);
+          }
           renderTodayStatSmart(d.items);
           getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
@@ -1443,12 +1501,14 @@
       const listens = (re.payload && re.payload.listens) || [];
       // 跟 state-worker 的 lbHistory() 取值逻辑相近但形状不同:这里只留 renderHistory()
       // 真正用得到的字段,是本地变量不是要对外暴露的 API 响应,没必要跟那边完全同形状。
-      const items = listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
-        const m = l.track_metadata, ai = m.additional_info || {};
-        return { title: m.track_name, artist: m.artist_name || '', album: m.release_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', device: ai.source || '', listenedAt: l.listened_at || 0 };
-      });
-      persistHistory(items);
-      renderHistory(items);
+      if (!lfmDone) {
+        const items = listens.filter(l => l.track_metadata && l.track_metadata.track_name).map(l => {
+          const m = l.track_metadata, ai = m.additional_info || {};
+          return { title: m.track_name, artist: m.artist_name || '', album: m.release_name || '', url: ai.apple_music_url || ai.netease_url || ai.qq_music_url || '', listenedAt: l.listened_at || 0 };
+        });
+        persistHistory(items);
+        renderHistory(items);
+      }
       const today = await collectTodayListens(listens);
       renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
       getMonthCounts().then(applyMonthCounts).catch(() => {});
@@ -1598,7 +1658,7 @@
     // 签名里拌上 currentLang:纯粹切语言、不动数据的话,不拌语言这个签名会对得上,导致
     // "更早"分割线之类的文字被这个去重优化拦住、停留在切换前的语言(跟 initComments()
     // 里的 sig 同一个坑,同一个修法)。
-    const sig = currentLang + '\n' + items.map(it => `${it.title}|${it.artist}|${it.url || ''}|${it.device || ''}`).join('\n');
+    const sig = currentLang + '\n' + items.map(it => `${it.title}|${it.artist}|${it.url || ''}`).join('\n');
     if (sig === historySig && !wrap.classList.contains('hidden')) return;
     const prevTop = box.scrollTop; // 确需重建时先记住滚动位置,建完还原
     historySig = sig;
@@ -1620,16 +1680,6 @@
       const a = document.createElement('a');
       a.title = `${it.title} — ${it.artist}`;
       if (it.url) { a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
-      // .h-dev 现在无条件创建(没有设备信息时留空,不是干脆不生成这个元素)——2026-07-31
-      // 实测坐实:之前"没设备就不生成"会让那一行在 flex 布局里少一个子项,后面的歌名/
-      // 专辑/歌手/次数列整体往左挤,跟有设备图标的行、跟表头都对不上;固定生成一个
-      // 同宽度的空 span 占住这个位置,才能保证每一行的列宽真的对齐。
-      const d = document.createElement('span'); d.className = 'h-dev';
-      if (it.device === 'iphone' || it.device === 'mac') {
-        d.innerHTML = DEV_ICON[it.device]; // 静态可信 SVG,非用户输入
-        d.title = it.device === 'iphone' ? 'iPhone' : 'Mac';
-      }
-      a.appendChild(d);
       // 这个局部变量不能叫 t——同一个 for 循环体块里上面 t('earlier') 用的是外层 i18n
       // 查找函数,若在这个块内任何位置 const t = ...,整个块从块首开始 t 就会被判成指向
       // 这个块作用域变量(暂时性死区),导致 t('earlier') 在运行到那一行时直接抛
