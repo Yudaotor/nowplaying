@@ -1490,7 +1490,7 @@
             persistHistory(items);
             renderHistory(items);
           }
-          renderTodayStatSmart(d.items);
+          if (!(lfmDone && await renderTodayStatFromLastfm())) renderTodayStatSmart(d.items);
           getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
         }
@@ -1509,8 +1509,10 @@
         persistHistory(items);
         renderHistory(items);
       }
-      const today = await collectTodayListens(listens);
-      renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
+      if (!(lfmDone && await renderTodayStatFromLastfm())) {
+        const today = await collectTodayListens(listens);
+        renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
+      }
       getMonthCounts().then(applyMonthCounts).catch(() => {});
     } catch (e) {}
   }
@@ -1552,8 +1554,17 @@
   // 的 playcount,**一个请求**就够(实测 747 首、totalPages=1),LB 那边要顺序翻十几页。
   // period 是 Last.fm 自己的滚动窗口(约 30 天),跟列名「30天」不是逐日严格对齐,但这一列
   // 的用途是"这首最近是不是在反复听",这个精度足够。
-  async function fetchLastfmMonthCounts() {
-    const counts = new Map();
+  // 一次请求同时拿到两样东西:每首歌的近月播放次数(给「30天」徽章)和时长(给今日统计)。
+  // duration 是 getTopTracks 顺带返回的字段,不用为时长再单独打任何请求 —— 而且它按
+  // **你实际 scrobble 的那个 key** 给值,比 track.getInfo 准:后者查
+  // "Michael Jackson / Scream" 会返回 153s 的另一个剪辑版,这里给的是 278s(真实时长)。
+  // 覆盖率不是 100%(实测 753 首里 550 首有时长),缺的那些交给 renderTodayStat 既有的
+  // 均值补估。
+  let lfmTop = null, lfmTopAt = 0;
+  async function getLastfmTopTracks() {
+    const now = Date.now();
+    if (lfmTop && now - lfmTopAt < MONTH_COUNTS_TTL) return lfmTop;
+    const counts = new Map(), durations = new Map();
     // 上限 3 页(3000 首)兜底防跑飞 —— 正常一个月的不同曲目远到不了 1000。
     for (let page = 1; page <= 3; page++) {
       const q = new URLSearchParams({
@@ -1565,12 +1576,64 @@
       const raw = tt.track || [];
       // 只有一条时 Last.fm 返回对象而不是数组,跟 getrecenttracks 同一个毛病。
       for (const t of (Array.isArray(raw) ? raw : [raw])) {
-        const n = Number((t && t.playcount) || 0);
-        if (t && t.name && n) counts.set(`${(t.artist && t.artist.name) || ''}|${t.name}`, n);
+        if (!t || !t.name) continue;
+        const key = `${(t.artist && t.artist.name) || ''}|${t.name}`;
+        const n = Number(t.playcount || 0);
+        if (n) counts.set(key, n);
+        const secs = Number(t.duration || 0);
+        if (secs > 0) durations.set(key, secs * 1000);
       }
       if (page >= Number((tt['@attr'] || {}).totalPages || 1)) break;
     }
-    return counts.size ? counts : null;
+    if (!counts.size) return null;
+    lfmTop = { counts, durations };
+    lfmTopAt = now;
+    return lfmTop;
+  }
+
+  // 今日统计(首数 + 时长)。首数用 Last.fm 更完整 —— 实测最近 5 天它每天都比 LB 多几条
+  // (LB 那边有些 iPhone 收听没桥接过来:08-06 LB 52 条 / Last.fm 60 条)。
+  //
+  // 时长交给 renderTodayStat 的既有均值补估,**不**改成"只算有时长的那些":一开始想当然
+  // 以为不补更准,拿 5 天实测打脸了 —— 08-05 那天 LB 只缺 1 条时长、真值最可信,不补是
+  // −34.8%,补了是 +2.4%。Last.fm 的时长覆盖率逐日波动,覆盖低的日子不补会严重少算。
+  // 这个数字本来就带「约」字,补估是它设计上该做的事。
+  // 成功渲染返回 true;未启用或取数失败返回 false,让调用方退回 LB 那条路。
+  async function renderTodayStatFromLastfm() {
+    if (!lastfmHistoryOn()) return false;
+    try {
+      const items = await fetchLastfmTodayStat();
+      if (!items) return false;
+      renderTodayStat(items);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function fetchLastfmTodayStat() {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const from = Math.floor(midnight.getTime() / 1000);
+    const items = [];
+    const top = await getLastfmTopTracks();
+    const durations = (top && top.durations) || new Map();
+    // from= 让 Last.fm 只回当天的,不用自己翻页找当天边界。上限 4 页(800 条)防跑飞。
+    for (let page = 1; page <= 4; page++) {
+      const q = new URLSearchParams({
+        method: 'user.getrecenttracks', user: LFM_USER, api_key: LFM_KEY,
+        format: 'json', limit: '200', page: String(page), from: String(from),
+      });
+      const d = await fetchJSON(`${LFM}?${q}`, 12000);
+      const rt = (d && d.recenttracks) || {};
+      const raw = rt.track || [];
+      for (const t of (Array.isArray(raw) ? raw : [raw])) {
+        if (!t || !t.name || (t['@attr'] && t['@attr'].nowplaying)) continue;
+        const key = `${(t.artist && t.artist['#text']) || ''}|${t.name}`;
+        items.push({ listenedAt: Number((t.date && t.date.uts) || from), durationMs: durations.get(key) || 0 });
+      }
+      if (page >= Number((rt['@attr'] || {}).totalPages || 1)) break;
+    }
+    return items.length ? items : null;
   }
 
   async function getMonthCounts() {
@@ -1578,8 +1641,8 @@
     if (monthCounts && now - monthCountsAt < MONTH_COUNTS_TTL) return monthCounts;
     if (lastfmHistoryOn()) {
       try {
-        const c = await fetchLastfmMonthCounts();
-        if (c) { monthCounts = c; monthCountsAt = now; return monthCounts; }
+        const top = await getLastfmTopTracks();
+        if (top) { monthCounts = top.counts; monthCountsAt = now; return monthCounts; }
       } catch (e) { /* Last.fm 不通 → 落到下面 LB 那条路,拼写对不上的那些行会没有徽章,
                        但 78% 有总比整列空白强 */ }
     }
