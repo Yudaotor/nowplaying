@@ -904,8 +904,8 @@
   const LFM = 'https://ws.audioscrobbler.com/2.0/';
   // 这两个都内嵌:线上分享出去的链接是固定的 ?user=<LB用户名>,不可能再要求带 Last.fm
   // 参数。URL 参数只留作覆盖(本地调试、或 fork 的人临时试)。
-  const LFM_KEY = params.get('lfmkey') || 'CHANGE_ME_LASTFM_API_KEY';
-  const LFM_USER = params.get('lfm') || 'CHANGE_ME_LASTFM_USER';
+  const LFM_KEY = params.get('lfmkey') || '8342b0851c2b71516ad4dd921fbc1366';
+  const LFM_USER = params.get('lfm') || 'KhalilChan3';
   // 两个占位符任一没换掉就整块退回 LB —— 这个页面同时是给别人 fork 的模板,
   // 不能因为对方没配 Last.fm 就少一块历史。
   const lastfmHistoryOn = () =>
