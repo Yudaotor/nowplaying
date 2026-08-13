@@ -601,7 +601,13 @@
     padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14);
     background: rgba(255,255,255,.06); color: #f5f6f8; font-size: var(--fs-body); font-family: inherit;
   }
-  .comment-name-input { width: 84px; flex-shrink: 0; }
+  /* 宽度必须容得下**最长的那个语言**的占位文字。84px 时中文「昵称(可选)」被切掉右括号:
+     全局 box-sizing: border-box,84 - 左右 padding 24 - 边框 2 = 58px 内容区,而这串在 13px
+     下实测 63.0px(同字体栈量的),溢出 5px。英文占位 Name 只有 35.3px,所以只有中文界面
+     露馅。104px 给到 78px 内容区,余量 15px —— 换成全角「昵称（可选）」(68.7px)也放得下,
+     但英文若改成 Nickname (optional)(122px)就装不下了,改文案前先量一遍。
+     表单是 flex-wrap,窄屏放不下会换行,不会把输入框挤扁。 */
+  .comment-name-input { width: 104px; flex-shrink: 0; }
   .comment-text { flex: 1 1 160px; min-width: 0; }
   .comment-name-input::placeholder, .comment-text::placeholder { color: #6b7280; }
   .comment-name-input:focus, .comment-text:focus { outline: none; border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); }
