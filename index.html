@@ -879,7 +879,8 @@
     <div id="reactions" class="reactions"></div>
     <div class="reactions-hint" data-i18n="reactionsHint">觉得有趣可以点个赞哦</div>
   </div>
-  <div id="footer-meta" class="meta">Apple Music</div>
+  <!-- 内容由 renderSourceMeta() 每轮 poll 覆写;初始留空,别写死某个播放器名 -->
+  <div id="footer-meta" class="meta"></div>
   <div id="visitor-count" class="visitor-count hidden" data-i18n-title="visitorCountTitle" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
 </div><!-- /.secondary -->
 <script>
@@ -1251,7 +1252,7 @@
     imgEl.style.opacity = 1;
     setLinks(s.links || {});
     setAccent(s.accent);
-    renderSourceMeta(s.coverSource, s.lyricsSource);
+    renderSourceMeta(s.coverSource, s.lyricsSource, s.mediaPlayer);
     // 歌词只在"有播放位置可驱动"时显示(与进度条同一判据)。iPhone 经 Last.fm 桥接的
     // 播放没有进度数据，歌词无法滚动、只会僵在首行，此时干脆不显示。
     const syncable = !!s.playing && s.durationMs > 0 && typeof s.progressTs === 'number';
@@ -1260,7 +1261,7 @@
     // 出最终形状(而不是只有标题/封面提前铺好,进度条和歌词仍要等 tick() 落地才弹出)。
     persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '',
       lyrics: s.lyrics || '', lyricsTr: s.lyricsTr || '', lyricsRoma: s.lyricsRoma || '', lyricsYRC: s.lyricsYRC || '',
-      coverSource: s.coverSource || '', lyricsSource: s.lyricsSource || '',
+      coverSource: s.coverSource || '', lyricsSource: s.lyricsSource || '', mediaPlayer: s.mediaPlayer || '',
       durationMs: s.durationMs || 0, progressMs: s.progressMs || 0, progressTs: (typeof s.progressTs === 'number' ? s.progressTs : null),
       rate: (s.rate == null ? null : s.rate), ageMs: (typeof s.ageMs === 'number' ? s.ageMs : null), fetchedAt: (typeof s.fetchedAt === 'number' ? s.fetchedAt : null),
       relayFresh: !!s.relayFresh,
@@ -1422,20 +1423,38 @@
     if (src === 'lrclib') return t('sourceLRCLIB');
     return '';
   }
-  function renderSourceMeta(coverSource, lyricsSource) {
+  // 采集器报上来的是 "Apple Music (macOS)" / "QQ Music (macOS)" /
+  // "NetEase Cloud Music (macOS)" / "Spotify (macOS)" / "Apple Music (iOS)"
+  // (见 collector 的 mediaPlayerLabel)。页脚这一行只要平台名:后面括号里的
+  // macOS/iOS 是"哪台设备",而设备已经由 s.source 单独表达,重复说一遍反而啰嗦。
+  //
+  // 中文界面下复用歌词来源那套平台名(网易云音乐/QQ音乐),跟同一行后半段
+  // "封面来自网易云音乐" 用词一致;Apple Music / Spotify 中英文同名,不另建词条。
+  function playerLabel(mp) {
+    if (!mp) return '';
+    if (mp.startsWith('QQ Music')) return t('sourceQQ');
+    if (mp.startsWith('NetEase')) return t('sourceNetease');
+    if (mp.startsWith('Spotify')) return 'Spotify';
+    if (mp.startsWith('Apple Music')) return 'Apple Music';
+    return mp; // 认不出的新播放器原样显示,总好过谎报成 Apple Music
+  }
+  function renderSourceMeta(coverSource, lyricsSource, mediaPlayer) {
     const elm = el('footer-meta');
     if (!elm) return;
+    // 播放器这一段从数据来,不再写死 —— 用 QQ 音乐/网易云听歌时原来这里始终显示
+    // "Apple Music",是错的。拿不到(老缓存、或 LB 上没这个字段的旧 listen)就整段
+    // 不显示,而不是退回某个猜测值。
+    const parts = [];
+    const player = playerLabel(mediaPlayer);
+    if (player) parts.push(player);
     const coverLabel = sourceLabel(coverSource), lyricsLabel = sourceLabel(lyricsSource);
-    let text = 'Apple Music';
     if (coverLabel && coverLabel === lyricsLabel) {
-      text += ` · ${t('coverLyricsVia', coverLabel)}`;
+      parts.push(t('coverLyricsVia', coverLabel));
     } else {
-      const parts = [];
       if (coverLabel) parts.push(t('coverVia', coverLabel));
       if (lyricsLabel) parts.push(t('lyricsVia', lyricsLabel));
-      if (parts.length) text += ` · ${parts.join(' · ')}`;
     }
-    elm.textContent = text;
+    elm.textContent = parts.join(' · ');
   }
 
   // 最近播放历史条:LB 已完成的 listen(现含 iPhone),去重取带封面的前几首,
@@ -2159,6 +2178,7 @@
             artwork: d.artwork || '', accent: d.accent || '', source: d.device || '',
             lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
             coverSource: d.coverSource || '', lyricsSource: d.lyricsSource || '',
+            mediaPlayer: d.mediaPlayer || '',
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
             // 服务器算的锚点年龄 + 本设备收到的时刻:据此外推不依赖本设备绝对时钟(消除跨设备时钟偏差)。
             ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(), relayFresh: d.source === 'kv',
@@ -2185,6 +2205,7 @@
           artwork: ai.cover_url || '', accent: ai.accent_color || '', source: ai.source || '',
           lyrics: ai.lyrics || '', lyricsTr: ai.lyrics_tr || '', lyricsRoma: ai.lyrics_roma || '', lyricsYRC: ai.lyrics_yrc || '',
           coverSource: ai.cover_source || '', lyricsSource: ai.lyrics_source || '',
+          mediaPlayer: ai.media_player || '',
           links: { apple: ai.apple_music_url, qq: ai.qq_music_url, netease: ai.netease_url, spotify: ai.spotify_url },
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate),
         };
