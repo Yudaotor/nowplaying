@@ -87,4 +87,4 @@ Lyrimuse (macOS App + 采集器)  ──推送──▶  state-worker (Cloudflar
 |---|---|
 | **Yudaotor/nowplaying**（本仓库） | 网页本体 |
 | [**Yudaotor/nowplaying-workers**](https://github.com/Yudaotor/nowplaying-workers) | 背后可选的 Cloudflare Worker 中继，外加一个实时 README 徽章 |
-| **Lyrimuse** | 推送实时状态的 macOS 菜单栏歌词 App（暂未开源——没有它页面也能靠 ListenBrainz 兜底正常跑） |
+| [**Lyrimuse**](https://github.com/Yudaotor/lyrimuse) | 推送实时状态的 macOS 菜单栏歌词 App（没有它页面也能靠 ListenBrainz 兜底正常跑） |

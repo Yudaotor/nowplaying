@@ -148,10 +148,12 @@
   :root[data-art-bg]:not([data-theme="light"]) .comments-empty,
   :root[data-art-bg]:not([data-theme="light"]) .c-time,
   :root[data-art-bg]:not([data-theme="light"]) .visitor-count,
+  :root[data-art-bg]:not([data-theme="light"]) .credit,
   :root[data-art-bg]:not([data-theme="light"]) .reactions-hint,
   :root[data-art-bg]:not([data-theme="light"]) .top-artists-updated,
   :root[data-art-bg]:not([data-theme="light"]) .meta { color: rgba(255,255,255,.55); }
-  :root[data-art-bg]:not([data-theme="light"]) .meta a { color: rgba(255,255,255,.72); }
+  :root[data-art-bg]:not([data-theme="light"]) .meta a,
+  :root[data-art-bg]:not([data-theme="light"]) .credit a { color: rgba(255,255,255,.72); }
   :root[data-art-bg]:not([data-theme="light"]) .history .h-title,
   :root[data-art-bg]:not([data-theme="light"]) .c-text { color: rgba(255,255,255,.92); }
   :root[data-art-bg]:not([data-theme="light"]) .history .h-album,
@@ -672,6 +674,9 @@
      renderSourceMeta() 每轮 poll 都会整体覆写 #footer-meta 的 textContent,放里面会被
      反复清空)。localStorage 的 np:visited 去重:同一浏览器只在"从未访问过"时才 POST 一次。 ---- */
   .visitor-count { margin-top: 4px; font-size: var(--fs-micro); color: #6b7280; }
+  .credit { margin-top: 4px; font-size: var(--fs-micro); color: #6b7280; }
+  .credit a { color: #8a91a0; text-decoration: none; }
+  .credit a:hover { text-decoration: underline; }
   /* ---- 主题(data-theme,存 localStorage):auto=氛围封面底(默认,不设属性) / light=浅色 ---- */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="light"] body { background: #e9ebf0; color: #1c1f26; }
@@ -718,7 +723,9 @@
   :root[data-theme="light"] .comments-empty,
   :root[data-theme="light"] .reactions-hint,
   :root[data-theme="light"] .c-time,
-  :root[data-theme="light"] .visitor-count { color: #7a828f; }
+  :root[data-theme="light"] .visitor-count,
+  :root[data-theme="light"] .credit { color: #7a828f; }
+  :root[data-theme="light"] .credit a { color: #5a616e; }
   :root[data-theme="light"] .c-name,
   :root[data-theme="light"] .c-text { color: #2a2e37; }
   :root[data-theme="light"] .comment-name-input,
@@ -882,6 +889,10 @@
   <!-- 内容由 renderSourceMeta() 每轮 poll 覆写;初始留空,别写死某个播放器名 -->
   <div id="footer-meta" class="meta"></div>
   <div id="visitor-count" class="visitor-count hidden" data-i18n-title="visitorCountTitle" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
+  <!-- 2026-08-24 加:这个页面是 Lyrimuse 项目对外分发的一个真实曝光点,之前完全没有可见
+       的署名/链接(唯一提到 Lyrimuse 的地方是一行 JS 注释,访客看不到)。跟 visitor-count
+       同款极简页脚小字处理,不抢视觉。 -->
+  <div class="credit"><span data-i18n="poweredByPrefix"></span><a href="https://github.com/Yudaotor/lyrimuse" target="_blank" rel="noopener">Lyrimuse</a><span data-i18n="poweredBySuffix"></span></div>
 </div><!-- /.secondary -->
 <script>
 (() => {
@@ -944,6 +955,7 @@
       topArtists: '历史播放 Top10 歌手', topArtistsUpdated: t => `更新于 · ${t}`,
       reactionsHint: '觉得有趣可以点个赞哦',
       visitorCountTitle: '同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次',
+      poweredByPrefix: '由 ', poweredBySuffix: ' 驱动',
       justNow: '刚刚', minutesAgo: n => `${n} 分钟前`, hoursAgo: n => `${n} 小时前`, daysAgo: n => `${n} 天前`,
       unknownTrack: '未知曲目', nowPlaying: '他正在播放', paused: '已暂停',
       lastPlayed: t => `上次播放 · ${t}`, recentlyPlayed: '最近播放',
@@ -976,6 +988,7 @@
       topArtists: 'Top 10 Artists (All Time)', topArtistsUpdated: t => `Updated · ${t}`,
       reactionsHint: 'Tap ❤️ if you enjoy this',
       visitorCountTitle: 'Counted once per browser; clearing cache/switching browsers/private mode counts again',
+      poweredByPrefix: 'Powered by ', poweredBySuffix: '',
       justNow: 'just now', minutesAgo: n => `${n}m ago`, hoursAgo: n => `${n}h ago`, daysAgo: n => `${n}d ago`,
       unknownTrack: 'Unknown Track', nowPlaying: 'Now Playing', paused: 'Paused',
       lastPlayed: t => `Last played · ${t}`, recentlyPlayed: 'Recently played',

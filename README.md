@@ -87,4 +87,4 @@ Lyrimuse (macOS app + collector)  ──push──▶  state-worker (Cloudflare 
 |---|---|
 | **Yudaotor/nowplaying** (this repo) | The web page itself |
 | [**Yudaotor/nowplaying-workers**](https://github.com/Yudaotor/nowplaying-workers) | The optional Cloudflare Worker relay behind it, plus a live README badge |
-| **Lyrimuse** | The macOS menu-bar lyrics app whose collector pushes live state (not yet open-source — the page runs fine without it on the ListenBrainz fallback) |
+| [**Lyrimuse**](https://github.com/Yudaotor/lyrimuse) | The macOS menu-bar lyrics app whose collector pushes live state (the page runs fine without it on the ListenBrainz fallback) |
