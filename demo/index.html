@@ -1645,6 +1645,15 @@
       if (!sameTrack || !lrcLines.length) {
         const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
         const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
+        // 歌词自带的 [offset:±毫秒](正数=歌词整体提前显示,显示时刻=时间戳−offset)。
+        // 与主站 index.html 同一份修复(2026-09-01),细节见那边注释。
+        const parseOffsetMs = (t) => {
+          const m = (t || '').match(/\[offset:\s*([+-]?\d+)\s*\]/);
+          if (!m) return 0;
+          const v = +m[1];
+          return Math.abs(v) <= 10000 ? v : 0;
+        };
+        const lrcOff = parseOffsetMs(s.lyrics) || parseOffsetMs(s.lyricsYRC);
         inner.textContent = ''; lrcActive = -1;
         wrap.scrollTop = 0; lrcUserScrolling = false; if (lrcUserTimer) clearTimeout(lrcUserTimer);
         lrcLines = base.map(ln => {
@@ -1654,13 +1663,13 @@
           const main = document.createElement('div'); main.className = 'lrc-main';
           let words = null;
           if (ln.words) {
-            words = ln.words.map(w => { const sp = document.createElement('span'); sp.className = 'lrc-w'; sp.textContent = w.text; main.appendChild(sp); return { t: w.t, dur: w.dur || 0, el: sp }; });
+            words = ln.words.map(w => { const sp = document.createElement('span'); sp.className = 'lrc-w'; sp.textContent = w.text; main.appendChild(sp); return { t: w.t - lrcOff, dur: w.dur || 0, el: sp }; });
           } else { main.textContent = ln.text; }
           line.appendChild(main);
           const tt = nearestText(tr, ln.t, 700);
           if (tt) { const d = document.createElement('div'); d.className = 'lrc-tr'; d.textContent = tt; line.appendChild(d); }
           inner.appendChild(line);
-          return { t: ln.t, el: line, words };
+          return { t: ln.t - lrcOff, el: line, words };
         });
       }
       show = lrcLines.length > 0;
