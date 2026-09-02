@@ -1215,7 +1215,14 @@
     const key = `${artist}|${title}`;
     const sameTrack = key === curKey;
     curKey = key;
-    let art = s.artwork || '';
+    // ⚠️ 只认浏览器真加载得动的图。采集器 2026-08-31 起可能给出设备直送封面的
+    // file:///Users/<用户名>/… 本地路径 —— 那是**采集器那台机器**上的文件,这里永远
+    // 读不到。而下面那条 iTunes 兜底的闸是 `if (!art)`,file:// 是个非空字符串,会
+    // 大摇大摆地绕过兜底、直接被塞进 <img src>,表现就是"封面整块空白、其它一切正常"
+    // (2026-09-02 用户报)。采集器侧已经改成把图托管到中继、对外只发 https(见
+    // collector artworkrelay.go),这里是第二道:ListenBrainz 里**已经存下**的那两天
+    // 历史记录仍然带着 file://,走 fromLB 兜底那条路时还会回到这儿来。
+    let art = /^https?:\/\//i.test(s.artwork || '') ? s.artwork : '';
     const imgEl = el('art');
     if (!sameTrack) {
       resetPreview();
