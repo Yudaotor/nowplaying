@@ -1084,7 +1084,11 @@
     const key = `${artist}|${title}`;
     const sameTrack = key === curKey;
     curKey = key;
-    let art = s.artwork || '';
+    // 只认浏览器真加载得动的图 —— 采集器可能给出设备直送封面的 file:// 本地路径,
+    // 那是它那台机器上的文件。下面 iTunes 兜底的闸是 `if (!art)`,非空的 file:// 会
+    // 绕过它、直接被塞进 <img src>,表现是"封面整块空白、其它一切正常"(2026-09-02)。
+    // 跟 ../index.html 里同一处逐字一致,改一边记得改另一边。
+    let art = /^https?:\/\//i.test(s.artwork || '') ? s.artwork : '';
     const imgEl = el('art');
     if (!sameTrack) {
       resetPreview();
