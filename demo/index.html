@@ -309,11 +309,14 @@
      .bar-fill-clip 单独负责裁剪(overflow:hidden,border-radius:inherit 保持跟外层
      一致的胶囊形状)——不能把 overflow:hidden 直接加到 .bar-fill 本身,那样会连带
      裁掉头部光晕(它的伪元素用 right:-1px 故意探出边界一点点,做出"卡在播放头上"的
-     视觉)。宽度用固定 px 而不是 .bar-fill 的百分比——歌曲刚开始播放、.bar-fill 本身
+     视觉)。高光本身固定 60px 宽而不是 .bar-fill 的百分比——歌曲刚开始播放、.bar-fill 本身
      还很窄时,百分比宽度会细成几乎看不见的一条线;固定像素能保证任何进度下这道
-     脉冲的粗细都一致,唯一变化的只是"走多远"(靠 left 的 0%→100% 关键帧,天然锚定
-     在 .bar-fill 当前的真实宽度上,进度条每帧更新宽度时这道脉冲的终点跟着一起走,
-     不需要额外同步代码)。
+     脉冲的粗细都一致,唯一变化的只是"走多远"。
+     动画只动 transform,交给合成层,不每帧重排:.bar-pulse 撑满 .bar-fill-clip(= .bar-fill
+     的宽度 W),60px 的高光画在它最右端(background-position:right);translateX 从 -100%
+     (高光落在 [-60,0],看不见)走到 +60px(高光落在 [W,W+60],刚好走出),跟原来 left 从
+     -60px 走到 100% 是同一条轨迹、同一个速度。-100% 按自身宽度算,.bar-fill 变宽时终点
+     跟着一起走,不需要额外同步代码。别改回动 left:那样播放中每一帧都要重排。
      ⚠️ 高亮颜色不能用跟 .bar-fill 底色相同的 var(--accent-fg)——半透明的某颜色叠在
      同一个颜色的不透明底色上,合成结果恒等于底色本身,无论透明度多高都不会产生任何
      可见差异(实测坐实:第一版这么写,截图看着progress条从头到尾就是纯一色,肉眼
@@ -326,8 +329,9 @@
     position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none;
   }
   .bar-pulse {
-    position: absolute; top: 0; bottom: 0; left: -60px; width: 60px;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.95) 100%);
+    position: absolute; top: 0; bottom: 0; left: 0; width: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.95) 100%) right / 60px 100% no-repeat;
+    transform: translateX(-100%);
     mix-blend-mode: screen;
     filter: blur(1px);
     opacity: 0;
@@ -337,8 +341,8 @@
     animation: bar-pulse-flow 2.2s linear infinite;
   }
   @keyframes bar-pulse-flow {
-    from { left: -60px; }
-    to   { left: 100%; }
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(60px); }
   }
   @media (prefers-reduced-motion: reduce) {
     .bar-pulse { display: none; }
@@ -1783,6 +1787,9 @@
     return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
   }
   let lastSec = -1;
+  // 进度条宽度按 0.1% 取整,变了才写:每写一次 width 就是一次重排,而一首 4 分钟的歌一秒只走
+  // 几个像素,每帧都写纯属白算。0.1% 在常见宽度下不到 1px,看不出台阶。
+  let lastBarPct = -1;
   function frame() {
     if (pb) {
       let pos = pb.progressMs;
@@ -1796,7 +1803,8 @@
       const cap = pb.fresh ? Infinity : 90000;
       if (pb.rate > 0 && ageMs > 0 && ageMs < cap) pos += ageMs * pb.rate;
       pos = Math.max(0, Math.min(pb.durationMs, pos));
-      el('bar-fill').style.width = (pb.durationMs > 0 ? (pos / pb.durationMs) * 100 : 0) + '%';
+      const barPct = pb.durationMs > 0 ? Math.round((pos / pb.durationMs) * 1000) / 10 : 0;
+      if (barPct !== lastBarPct) { lastBarPct = barPct; el('bar-fill').style.width = barPct + '%'; }
       const sec = Math.floor(pos / 1000);
       if (sec !== lastSec) {
         lastSec = sec;
