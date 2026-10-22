@@ -9,9 +9,10 @@ const COVER_MAX = 40;
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
-  // 删除旧壳缓存(升级后立即拿到新页面壳)；封面缓存保留。
+  // 删除旧壳缓存(升级后立即拿到新页面壳)；封面缓存保留。只删自己的(np- 开头):同一个域名下别的
+  // Pages 项目的缓存也在这里。
   const names = await caches.keys();
-  await Promise.all(names.filter((n) => n !== SHELL && n !== COVERS).map((n) => caches.delete(n)));
+  await Promise.all(names.filter((n) => n.startsWith('np-') && n !== SHELL && n !== COVERS).map((n) => caches.delete(n)));
   await self.clients.claim();
 })()));
 
@@ -53,12 +54,14 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== self.location.origin) return; // 其它跨域数据请求不拦
+  // 后台拉新、写回缓存交给 waitUntil:命中缓存时页面早就拿到旧壳了,不托住的话 SW 一被回收新版本就写不进去。
+  const shell = caches.open(SHELL);
+  const network = fetch(req)
+    .then(async (r) => { if (r && r.ok) await (await shell).put(req, r.clone()); return r; })
+    .catch(() => null);
+  e.waitUntil(network);
   e.respondWith((async () => {
-    const cache = await caches.open(SHELL);
-    const cached = await cache.match(req);
-    const network = fetch(req)
-      .then((r) => { if (r && r.ok) cache.put(req, r.clone()); return r; })
-      .catch(() => null);
+    const cached = await (await shell).match(req);
     return cached || (await network) || new Response('offline', { status: 503 });
   })());
 });

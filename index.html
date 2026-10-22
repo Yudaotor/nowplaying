@@ -965,6 +965,7 @@
       lastPlayed: t => `上次播放 · ${t}`, recentlyPlayed: '最近播放',
       updating: '更新中…',
       sourceNetease: '网易云音乐', sourceQQ: 'QQ音乐', sourceKugou: '酷狗音乐', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: '酷我音乐', sourceMigu: '咪咕音乐', sourceSoda: '汽水音乐', sourceLocalFile: '本地歌词文件', sourceLX: '洛雪音乐',
       coverLyricsVia: s => `封面歌词来自${s}`, coverVia: s => `封面来自${s}`, lyricsVia: s => `歌词来自${s}`,
       playedNTimes: n => `近30天播放 ${n} 次`,
       hoursMins: (h, m) => `${h} 小时 ${m} 分`, minsOnly: m => `${m} 分`, approx: '约 ',
@@ -998,6 +999,7 @@
       lastPlayed: t => `Last played · ${t}`, recentlyPlayed: 'Recently played',
       updating: 'Updating…',
       sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'a local lyrics file', sourceLX: 'LX Music',
       coverLyricsVia: s => `Cover & lyrics via ${s}`, coverVia: s => `Cover via ${s}`, lyricsVia: s => `Lyrics via ${s}`,
       playedNTimes: n => `${n} plays in the last 30 days`,
       hoursMins: (h, m) => `${h}h ${m}m`, minsOnly: m => `${m}m`, approx: '~ ',
@@ -1073,8 +1075,8 @@
     } catch (e) {}
     try {
       const q = encodeURIComponent(`${artist} ${title}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`);
-      const data = await res.json();
+      // 带时限:paint() 在等它,国内常慢,不封顶的话这一首的歌词、进度条要等它回来才换。
+      const data = await fetchJSON(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`, 5000);
       const result = pickITunesResult(data.results, title);
       const url100 = result && result.artworkUrl100;
       const url = url100 ? url100.replace('100x100bb', '600x600bb') : '';
@@ -1093,8 +1095,7 @@
     try { const c = localStorage.getItem(key); if (c !== null) { previewCache.set(key, c); return c; } } catch (e) {}
     try {
       const q = encodeURIComponent(`${artist} ${title}`);
-      const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`);
-      const data = await res.json();
+      const data = await fetchJSON(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`, 5000);
       const result = pickITunesResult(data.results, title);
       const url = (result && result.previewUrl) || '';
       previewCache.set(key, url);
@@ -1102,6 +1103,18 @@
       return url;
     } catch (e) { return ''; }
   }
+  // art: / prev: 每首歌各一个键、从不过期:攒多了撑满配额,np:last 这几份要紧的就写不进去了。超过上限整批清掉,
+  // 用到再查(只是少了跨次打开的缓存)。
+  (function pruneLookupCache() {
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('art:') || k.startsWith('prev:'))) keys.push(k);
+      }
+      if (keys.length > 400) keys.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+  })();
   let curPreviewUrl = '';
   function resetPreview() {
     const a = el('preview-audio'), btn = el('preview-btn');
@@ -1127,7 +1140,15 @@
 
   // 统一状态：{title, artist, album, playing, listenedAt, artwork}
   const LAST_KEY = 'np:last';
-  function persist(s) { try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch (e) {} }
+  // 内容没变就不写:每轮 tick 都会调到,一份带四种歌词的快照几十 KB。比的是去掉写入时刻之后的那部分。
+  let lastPersistBody = '';
+  function persist(s) {
+    const { persistedAt, ...rest } = s;
+    const body = JSON.stringify(rest);
+    if (body === lastPersistBody) return;
+    lastPersistBody = body;
+    try { localStorage.setItem(LAST_KEY, JSON.stringify(s)); } catch (e) {}
+  }
   function loadPersisted() { try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { return null; } }
   // 最近一次渲染的历史列表(裁到 40 条):首屏秒渲染用,让 history-wrap/两栏版式在
   // fetchHistory() 落地前就已经是最终形状,而不是从隐藏态弹出再把卡片撑宽。
@@ -1190,7 +1211,11 @@
   // 总能在这段时间内从服务端回来直接覆盖掉,清空分支只在真等满了还是没有时才兜底触发。
   let clearArtTimer = null;
   let artResolvedKey = ''; // 已经拿到过非空封面的 key,配合 clearArtTimer 判断是否该真的清空
+  // paintSeq:每次 paint 加一。等 iTunes 兜底回来时已经有更新的一次 paint 了(首屏缓存那次跟第一轮 tick、
+  // 两轮 tick 交错),这一次就作废,不拿旧快照盖掉新的。
+  let paintSeq = 0;
   async function paint(s) {
+    const seq = ++paintSeq;
     const title = s.title || t('unknownTrack');
     const artist = s.artist || '';
     const live = !!s.playing && s.rate !== 0;
@@ -1239,7 +1264,7 @@
       fallbackTriedKey = key;
       imgEl.style.opacity = .3;
       art = await artworkFor(artist, title);
-      if (key !== curKey) return;
+      if (key !== curKey || seq !== paintSeq) return;
     }
     // iTunes 搜索没做专辑区分,同一首歌撞上合集/精选辑重发时经常选错封面(实测坐实:Smooth
     // Criminal 就被兜底选中了合集版封面)。真封面几秒后从服务端 poll 回来时必须能纠正过来,
@@ -1283,7 +1308,7 @@
     setLyrics(s, syncable, sameTrack);
     // 一并缓存进度/歌词原文用的字段,好让下次开页时进度条和歌词面板也能跟着秒渲染
     // 出最终形状(而不是只有标题/封面提前铺好,进度条和歌词仍要等 tick() 落地才弹出)。
-    persist({ title, artist, album: s.album || '', playing: !!s.playing, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '',
+    persist({ title, artist, album: s.album || '', playing: !!s.playing, current: s.current === true, listenedAt: s.listenedAt || null, artwork: art, links: s.links || {}, accent: s.accent || '', source: s.source || '',
       lyrics: s.lyrics || '', lyricsTr: s.lyricsTr || '', lyricsRoma: s.lyricsRoma || '', lyricsYRC: s.lyricsYRC || '',
       coverSource: s.coverSource || '', lyricsSource: s.lyricsSource || '', mediaPlayer: s.mediaPlayer || '',
       durationMs: s.durationMs || 0, progressMs: s.progressMs || 0, progressTs: (typeof s.progressTs === 'number' ? s.progressTs : null),
@@ -1386,6 +1411,7 @@
     const im = new Image();
     im.crossOrigin = 'anonymous';
     im.onload = () => {
+      if (url !== lastArtBlurUrl) return; // 连着换歌时旧封面晚到,别拿它的亮度
       try {
         const c = document.createElement('canvas'); c.width = c.height = 8;
         const g = c.getContext('2d');
@@ -1400,7 +1426,7 @@
         document.documentElement.style.removeProperty('--art-scrim');
       }
     };
-    im.onerror = () => document.documentElement.style.removeProperty('--art-scrim');
+    im.onerror = () => { if (url === lastArtBlurUrl) document.documentElement.style.removeProperty('--art-scrim'); };
     im.src = url;
   }
 
@@ -1421,7 +1447,7 @@
       // 用 persistedAt(写入这份缓存时的墙钟时间)兜底出一个真实的"距今多久",复用既有的
       // "上次播放 · X" 文案,不需要新增状态分支。
       const listenedAt = p.listenedAt || (p.persistedAt ? Math.floor(p.persistedAt / 1000) : null);
-      await paint({ ...p, playing: false, listenedAt });
+      await paint({ ...p, playing: false, current: false, listenedAt });
     }
     setProgress(null); // 退回"上次播放"语义,不是当下真实进度,别继续顶着一条不会走的进度条
     document.querySelector('.card.hero').classList.remove('stale');
@@ -1440,12 +1466,16 @@
   // 页脚"封面/歌词来自XX"如实反映采集器实际解析到的来源(coverSource/lyricsSource,
   // 见 collector/enrich.go)，而不是写死"来自网易云"——封面/歌词各自可能来自网易云/
   // QQ音乐/LRCLIB 三个不同平台，也可能哪个平台都没解析到。
+  // 国内平台按界面语言写,海外品牌中英文同名;跟 App「歌词管理」的来源名一致。引擎内部的代号(device、player)
+  // 不是平台,不显示。
+  const SOURCE_KEYS = { netease: 'sourceNetease', qq: 'sourceQQ', kugou: 'sourceKugou', lrclib: 'sourceLRCLIB',
+    kuwo: 'sourceKuwo', migu: 'sourceMigu', soda: 'sourceSoda', localfile: 'sourceLocalFile', lxmusic: 'sourceLX' };
+  const SOURCE_BRANDS = { musixmatch: 'Musixmatch', amll: 'AMLL', lyricfind: 'LyricFind', deezer: 'Deezer',
+    applemusic: 'Apple Music', apple: 'Apple Music', vibe: 'VIBE', genie: 'Genie', petitlyrics: 'PetitLyrics',
+    kkbox: 'KKBOX', spotify: 'Spotify', amazon: 'Amazon Music' };
   function sourceLabel(src) {
-    if (src === 'netease') return t('sourceNetease');
-    if (src === 'qq') return t('sourceQQ');
-    if (src === 'kugou') return t('sourceKugou');
-    if (src === 'lrclib') return t('sourceLRCLIB');
-    return '';
+    if (SOURCE_KEYS[src]) return t(SOURCE_KEYS[src]);
+    return SOURCE_BRANDS[src] || '';
   }
   // 采集器报上来的是 "Apple Music (macOS)" / "QQ Music (macOS)" /
   // "NetEase Cloud Music (macOS)" / "Spotify (macOS)" / "Apple Music (iOS)"
@@ -1460,7 +1490,7 @@
     if (mp.startsWith('NetEase')) return t('sourceNetease');
     if (mp.startsWith('Spotify')) return 'Spotify';
     if (mp.startsWith('Apple Music')) return 'Apple Music';
-    return mp; // 认不出的新播放器原样显示,总好过谎报成 Apple Music
+    return mp.replace(/\s*\((macOS|iOS)\)$/, ''); // 认不出的新播放器原样显示(去掉设备),总好过谎报成 Apple Music
   }
   function renderSourceMeta(coverSource, lyricsSource, mediaPlayer) {
     const elm = el('footer-meta');
@@ -1519,11 +1549,21 @@
     }
   }
 
+  // 同一时刻只跑一轮:切回标签、定时器连着叫时不叠。
+  let historyBusy = false;
   async function fetchHistory() {
+    if (historyBusy) return;
+    historyBusy = true;
+    try { await fetchHistoryOnce(); } finally { historyBusy = false; }
+  }
+  async function fetchHistoryOnce() {
     if (!moduleConfig.history) { el('history-wrap').classList.add('hidden'); updateLayout(); return; }
     if (USER === 'CHANGE_ME') return;
     // 历史列表先试 Last.fm;成功了下面两条 LB 路径就只负责统计和日历。
     const lfmDone = await fetchLastfmHistory();
+    // Last.fm 把列表和今日统计都给了:中继 /history、LB 那两份只为兜底,不再拉(每分钟一次,上百 KB)。
+    const statDone = lfmDone && await renderTodayStatFromLastfm();
+    if (statDone) { getMonthCounts().then(applyMonthCounts).catch(() => {}); return; }
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
     // album 字段(2026-07-31 新增专辑列)由 state-worker(另一个仓库 Yudaotor/
@@ -1539,7 +1579,7 @@
             persistHistory(items);
             renderHistory(items);
           }
-          if (!(lfmDone && await renderTodayStatFromLastfm())) renderTodayStatSmart(d.items);
+          renderTodayStatSmart(d.items);
           getMonthCounts().then(applyMonthCounts).catch(() => {});
           return;
         }
@@ -1558,7 +1598,7 @@
         persistHistory(items);
         renderHistory(items);
       }
-      if (!(lfmDone && await renderTodayStatFromLastfm())) {
+      {
         const today = await collectTodayListens(listens);
         renderTodayStat(today.map(l => ({ listenedAt: l.listened_at || 0, durationMs: (l.track_metadata && l.track_metadata.additional_info || {}).duration_ms })));
       }
@@ -1809,7 +1849,8 @@
     // 签名里拌上 currentLang:纯粹切语言、不动数据的话,不拌语言这个签名会对得上,导致
     // "更早"分割线之类的文字被这个去重优化拦住、停留在切换前的语言(跟 initComments()
     // 里的 sig 同一个坑,同一个修法)。
-    const sig = currentLang + '\n' + items.map(it => `${it.title}|${it.artist}|${it.url || ''}`).join('\n');
+    // 拌上日期:过了零点数据没变,「更早」分割线也要挪。
+    const sig = currentLang + '\n' + new Date().toDateString() + '\n' + items.map(it => `${it.title}|${it.artist}|${it.url || ''}`).join('\n');
     if (sig === historySig && !wrap.classList.contains('hidden')) return;
     const prevTop = box.scrollTop; // 确需重建时先记住滚动位置,建完还原
     historySig = sig;
@@ -1892,6 +1933,7 @@
   // additional_info；这里合并成多行 DOM(罗马音上/原文中/翻译下)，在进度条 rAF 里按外推
   // 位置高亮当前行、有逐字则逐字点亮，并整体位移把当前行滚到视口偏上 38% 处。
   let lrcLines = [];   // [{t, el, words:[{t,el}]|null}]
+  let lrcSig = '';     // 当前建好的那份歌词的内容签名(四种歌词拼起来),同一首歌换了词据此重建
   let lrcActive = -1;
   // 手动滑动:用户一滚(滚轮/触摸)就暂停自动跟随;停手 LRC_RESUME_MS 后平滑滚回当前行居中。
   let lrcUserScrolling = false, lrcUserTimer = null;
@@ -1959,7 +2001,10 @@
     const wrap = el('lyrics'), inner = el('lyrics-inner'), empty = el('lyrics-empty');
     let show = false;
     if (s) { // 2026-08-04 起有曲目就构建/保留歌词——暂停/无进度数据也照样显示,只是不滚动
-      if (!sameTrack || !lrcLines.length) {
+      // 同一首歌的词也可能换(先上屏的那份定案、译文晚到、改了歌词、标成纯音乐):内容签名变了就重建。
+      const sig = [s.lyrics, s.lyricsTr, s.lyricsRoma, s.lyricsYRC].map(v => v || '').join('\u0000');
+      if (!sameTrack || !lrcLines.length || sig !== lrcSig) {
+        lrcSig = sig;
         const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
         const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
         // 歌词自带的 [offset:±毫秒](LRC 规范：正数=歌词整体提前显示，显示时刻=时间戳−offset)。
@@ -1995,7 +2040,7 @@
       }
       show = lrcLines.length > 0;
     } else {
-      inner.textContent = ''; lrcLines = []; lrcActive = -1;
+      inner.textContent = ''; lrcLines = []; lrcActive = -1; lrcSig = '';
     }
     wrap.classList.toggle('show', show);
     if (show && !syncable) {
@@ -2168,7 +2213,8 @@
       // kv 锚点(采集器直推、准确)不限龄外推——连播中途采集器不重写锚点也能一路走对,省 KV 写额度;
       // 只有 lb 兜底锚点(可能陈旧)才封顶 90s,防坏锚点把进度条冲到远超实际。
       const cap = pb.fresh ? Infinity : 90000;
-      if (pb.rate > 0 && ageMs > 0 && ageMs < cap) pos += ageMs * pb.rate;
+      // 超过封顶就停在封顶那里,别跳回锚点。
+      if (pb.rate > 0 && ageMs > 0) pos += Math.min(ageMs, cap) * pb.rate;
       pos = Math.max(0, Math.min(pb.durationMs, pos));
       const barPct = pb.durationMs > 0 ? Math.round((pos / pb.durationMs) * 1000) / 10 : 0;
       if (barPct !== lastBarPct) { lastBarPct = barPct; el('bar-fill').style.width = barPct + '%'; }
@@ -2223,9 +2269,9 @@
             durationMs: d.durationMs, progressMs: d.progressMs, progressTs: d.progressTs, rate: d.rate,
             // 服务器算的锚点年龄 + 本设备收到的时刻:据此外推不依赖本设备绝对时钟(消除跨设备时钟偏差)。
             ageMs: (typeof d.ageMs === 'number' ? d.ageMs : null), fetchedAt: Date.now(), relayFresh: d.source === 'kv',
-            links: d.links || {}, modules: d.modules };
+            links: d.links || {}, modules: d.modules, fromRelay: true };
         }
-        if (d && d.empty) return { empty: true, modules: d.modules };
+        if (d && d.empty) return { empty: true, modules: d.modules, fromRelay: true };
       } catch (e) { /* 中继不通 → 落到下面 LB 兜底 */ }
     }
     try {
@@ -2251,6 +2297,7 @@
           durationMs: num(ai.duration_ms), progressMs: num(ai.progress_ms), progressTs: num(ai.progress_ts), rate: num(ai.playback_rate),
         };
       };
+      if (USER === 'CHANGE_ME') return null; // 没配用户名只有中继这一路
       const pn = await fetchJSON(`${LB}/1/user/${encodeURIComponent(USER)}/playing-now`, 8000);
       const now = pn.payload && pn.payload.listens && pn.payload.listens[0];
       if (now) return fromLB(now, true, null);
@@ -2262,12 +2309,32 @@
   }
 
   let everRendered = false;
+  // lastPainted:最近一次画上去的实时状态;nullStreak:连着几轮什么都没取到。
+  let lastPainted = null, nullStreak = 0;
+  // 实时数据断了(中继说「空」、或连着几轮都取不到):屏上还是「正在播放 / 已暂停」的话退回「上次播放」,
+  // 进度条和歌词不再外推。只降级、不换歌:之后放了什么这里不知道。
+  async function demoteLive() {
+    setProgress(null);
+    const p = lastPainted;
+    if (!p || (!p.playing && p.current !== true)) return;
+    lastPainted = { ...p, playing: false, current: false, listenedAt: p.listenedAt || Math.floor(Date.now() / 1000) };
+    await paint(lastPainted);
+  }
+  // 同一时刻只跑一轮:中继不通时一轮要等到 20 秒,比 POLL_MS 长,叠着跑的话慢的那轮后落地会把新的盖掉。
+  // 跑着时又被叫到(定时器、切回标签)就记一笔,跑完再补一轮。
+  let tickBusy = false, tickAgain = false;
   async function tick() {
-    if (USER === 'CHANGE_ME') { paintIdle('notConfigured'); return; }
+    if (tickBusy) { tickAgain = true; return; }
+    tickBusy = true;
+    try { await tickOnce(); } finally { tickBusy = false; }
+    if (tickAgain) { tickAgain = false; tick(); }
+  }
+  async function tickOnce() {
+    if (USER === 'CHANGE_ME' && !RELAY) { paintIdle('notConfigured'); return; }
     const s = await fetchState();
-    // 拿到真实响应(哪怕是 empty)才刷新模块开关——总请求失败(s===null)保留上一份已知
-    // 有效的配置不动,不能因为一次瞬时失败就把模块打回默认全开。
-    if (s) {
+    // 拿到中继的真实响应(哪怕是 empty)才刷新模块开关:总请求失败(s===null)保留上一份已知有效的配置;
+    // LB 兜底的响应根本没有 modules,当成全开的话站长关掉的板块会被打回来、还写进缓存。
+    if (s && s.fromRelay) {
       moduleConfig = normalizeModules(s.modules);
       persistModules(moduleConfig);
       applyModuleVisibility();
@@ -2280,16 +2347,26 @@
       const lv = loadLive();
       if (lv && lv.seenAt && `${lv.artist}|${lv.title}` !== `${s.artist}|${s.title}`
           && (!s.listenedAt || lv.seenAt / 1000 > s.listenedAt)) {
-        await paint({ title: lv.title, artist: lv.artist, album: lv.album, artwork: lv.artwork,
-          links: lv.links, accent: lv.accent, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) });
+        lastPainted = { title: lv.title, artist: lv.artist, album: lv.album, artwork: lv.artwork,
+          links: lv.links, accent: lv.accent, playing: false, listenedAt: Math.floor(lv.seenAt / 1000) };
+        nullStreak = 0;
+        await paint(lastPainted);
         setProgress(null); setStale(false); everRendered = true; return;
       }
     }
-    if (s && !s.empty) { await paint(s); setProgress(s); setStale(false); everRendered = true; return; }
-    if (s && s.empty) { setProgress(null); if (!everRendered) paintIdle('noListensYet'); else await revertStale(); return; }
+    if (s && !s.empty) { lastPainted = s; nullStreak = 0; await paint(s); setProgress(s); setStale(false); everRendered = true; return; }
+    if (s && s.empty) {
+      nullStreak = 0;
+      setProgress(null);
+      if (!everRendered) paintIdle('noListensYet'); else { await revertStale(); await demoteLive(); }
+      return;
+    }
     // s === null：数据源都拿不到（LB 抽风等）→ 保留当前显示，不清屏；
-    // 但首屏的“更新中…”不能一直挂着，把缓存那首按上次播放正常显示（后台继续重试）。
-    if (!everRendered) paintIdle('connectingRetry', true); else await revertStale();
+    // 但首屏的“更新中…”不能一直挂着，把缓存那首按上次播放正常显示（后台继续重试）。连着 3 轮(半分钟)都取不到,
+    // 屏上的「正在播放」退回「上次播放」,别让进度条和歌词一路走到歌曲结尾。
+    nullStreak++;
+    if (!everRendered) paintIdle('connectingRetry', true);
+    else { await revertStale(); if (nullStreak >= 3) await demoteLive(); }
   }
 
   // 试听按钮:点击切播放/暂停(首次点击才真正加载音频,满足自动播放手势要求)。
@@ -2401,7 +2478,10 @@
       wrap.classList.toggle('vinyl', on); btn.classList.toggle('on', on);
       if (window.__vinylSpinRefresh) window.__vinylSpinRefresh();
     };
-    apply(localStorage.getItem('np:vinyl') !== '0'); // 默认黑胶;仅当用户显式关过('0')才方形
+    // 读不了存储(浏览器禁了网站数据、受限 iframe)时会抛,整份脚本就停在这里:同 detectLang 一律包 try。
+    let savedVinyl = null;
+    try { savedVinyl = localStorage.getItem('np:vinyl'); } catch (e) {}
+    apply(savedVinyl !== '0'); // 默认黑胶;仅当用户显式关过('0')才方形
     btn.addEventListener('click', () => {
       const on = !wrap.classList.contains('vinyl');
       apply(on);
@@ -2426,7 +2506,8 @@
       // data-theme 属性改完之后立刻重算,不等下一次换歌才生效。
       refreshAccentFg();
     };
-    let cur = localStorage.getItem('np:theme');
+    let cur = null;
+    try { cur = localStorage.getItem('np:theme'); } catch (e) {}
     if (!THEMES.includes(cur)) cur = 'auto';
     apply(cur);
     btn.addEventListener('click', () => {
@@ -2549,7 +2630,8 @@
       lastItems = items;
       // sig 里拼进 currentLang(跟 renderHistory 同一个修法):否则切语言但留言数据没变时,
       // 这个"内容签名没变就跳过重绘"的优化会让"还没有留言"/"匿名"这类固定文案卡在旧语言。
-      const s = currentLang + '\n' + items.map(c => `${c.id}|${c.name}|${c.text}`).join('\n');
+      // 拌上「刚刚 / N 分钟前」这类相对时间:数据没变时也要跟着走。
+      const s = currentLang + '\n' + items.map(c => `${c.id}|${c.name}|${c.text}|${relTime(Math.floor((c.at || 0) / 1000))}`).join('\n');
       if (s === sig) return;
       sig = s;
       box.textContent = '';
@@ -2667,7 +2749,7 @@
     if (el('status').classList.contains('idle')) {
       if (lastIdleKey) paintIdle(lastIdleKey, lastIdleConnecting);
     } else {
-      const p = loadPersisted();
+      const p = lastPainted || loadPersisted();
       if (p && p.title) paint(p);
     }
     const ph = loadPersistedHistory();
