@@ -7,7 +7,7 @@
 **语言 / Language:** [English](README.md) | **简体中文**
 
 ![Single file](https://img.shields.io/badge/%E5%8D%95%E6%96%87%E4%BB%B6-%E6%97%A0%E6%9E%84%E5%BB%BA%E6%AD%A5%E9%AA%A4-success)
-![Bilingual](https://img.shields.io/badge/%E7%95%8C%E9%9D%A2-%E4%B8%AD%E6%96%87%20%2F%20English-blue)
+![五种语言](https://img.shields.io/badge/%E7%95%8C%E9%9D%A2-%E4%B8%AD%E6%96%87%20%C2%B7%20English%20%C2%B7%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%C2%B7%20%ED%95%9C%EA%B5%AD%EC%96%B4-blue)
 ![GitHub Pages](https://img.shields.io/badge/%E6%89%98%E7%AE%A1%E5%9C%A8-GitHub%20Pages-222)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
@@ -32,7 +32,7 @@
 - **黑胶模式** 💿——封面缩成唱片中心的标签，播放时匀速旋转、暂停时唱臂抬起（纯 CSS + Web Animations，不额外耗电）
 - **最近播放**，按今天/更早分组、带近 30 天播放次数，另有全时段 **Top10 歌手**榜单
 - **留言墙、❤️ 点赞、访客计数**，给来看你主页的人玩
-- **中英双语界面**——自动跟随访客浏览器语言，🌐 按钮随时手动切换，选择会记住
+- **五种界面语言**——简体、繁体、英文、日文、韩文，按访客浏览器的首选语言挑，都不匹配时用英文；🌐 菜单随时切换，选择会记住
 - **氛围/浅色主题 + 沉浸全屏模式**——适合平板或副屏常驻显示
 - **社交链接预览**——链接粘进 Slack/Discord/微信会自动展开当前歌名和封面
 - **一个自包含的 `index.html`**——没有框架、没有构建步骤，任何静态托管都能放

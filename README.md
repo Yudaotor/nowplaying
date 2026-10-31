@@ -7,7 +7,7 @@
 **Language / 语言:** **English** | [简体中文](README.zh-CN.md)
 
 ![Single file](https://img.shields.io/badge/single%20file-no%20build%20step-success)
-![Bilingual](https://img.shields.io/badge/UI-English%20%2F%20%E4%B8%AD%E6%96%87-blue)
+![Five languages](https://img.shields.io/badge/UI-English%20%C2%B7%20%E4%B8%AD%E6%96%87%20%C2%B7%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%C2%B7%20%ED%95%9C%EA%B5%AD%EC%96%B4-blue)
 ![GitHub Pages](https://img.shields.io/badge/hosted%20on-GitHub%20Pages-222)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
@@ -32,7 +32,7 @@
 - **Vinyl mode** 💿 — the cover shrinks to a record label, spins while playing, tonearm lifts on pause (pure CSS + Web Animations, no battery cost)
 - **Recent plays** with today/earlier grouping and 30-day play counts, plus an all-time **Top-10 artists** leaderboard
 - **Guestbook, ❤️ reactions, and a visitor counter** for your visitors
-- **Bilingual UI** — auto-detects the visitor's browser language (English/Chinese), manual 🌐 toggle, choice remembered
+- **Five UI languages** — English, Simplified and Traditional Chinese, Japanese, Korean; follows the visitor's browser languages (English when none match), 🌐 menu to switch, choice remembered
 - **Ambient / light themes and an immersive fullscreen mode** — nice on a tablet or a second monitor
 - **Rich link previews** — paste the link in Slack/Discord/WeChat and it unfurls with the current track and cover
 - **One self-contained `index.html`** — no framework, no build step; host it on any static host

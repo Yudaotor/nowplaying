@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://np.yudaotor.me/cover">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <style>
-  /* 统一字号阶梯(2026-07-31)——标题(h1/.artist/.album)和歌词三行(.lrc-roma/
+  /* 统一字号阶梯——标题(h1/.artist/.album)和歌词三行(.lrc-roma/
      .lrc-main/.lrc-tr)这次单独调过、各自有专属的层级关系,不纳入这套通用阶梯;
      这里统一的是页面其余部分(历史列表/留言墙/Top10歌手/状态徽章/页脚小字等)——
      这些原来是十几轮改动各自零散定的字号(9/10/11/12/13/15px 混杂,同样是"次要
@@ -47,7 +47,7 @@
     color: #f5f6f8;
     display: grid;
     place-items: center;
-    /* 2026-07-31 起页面主体是两张纵向堆叠的卡片(.hero 封面+歌词、.secondary 其它模块),
+    /* 页面主体是两张纵向堆叠的卡片(.hero 封面+歌词、.secondary 其它模块),
        gap 留出两者之间的呼吸空间——body 本身没设 grid-template,两个 .card 子元素按隐式
        网格自动各占一行,place-items:center 让每一行都独立居中,不用额外包一层容器。 */
     gap: 24px;
@@ -56,7 +56,14 @@
     overflow-x: hidden;
     position: relative;
   }
-  /* 2026-07-30 全页渐变(对齐 Apple Music 全屏歌词页背景),2026-08-01 改成真封面模糊
+  /* 汉字按页面语言取字形:日文、繁体不用简体的 PingFang SC。 */
+  html:lang(zh-Hant) body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", sans-serif; }
+  html:lang(ja) body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Helvetica Neue", sans-serif; }
+  html:lang(ko) body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Helvetica Neue", sans-serif; }
+  /* 🌐 是一个盖着透明下拉框的按钮,点开就是系统的语言列表;16px 免得 iOS 点开时放大页面。 */
+  #lang-toggle { position: relative; cursor: pointer; }
+  #lang-select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; border: 0; -webkit-appearance: none; appearance: none; }
+  /* 全页渐变(对齐 Apple Music 全屏歌词页背景),改成真封面模糊
      (歌词软件"歌词窗口"先做出这个效果,回头照搬到网页):最早试过从原图取多个色板
      混色,采集器只给一个 accent 主色,硬凑多色相反而做出被吐槽"到处跳"的廉价彩虹
      色斑,退回改成纯色相渐变;现在这版不再是"从图片提炼出的颜色",而是图片本身模糊+
@@ -73,7 +80,7 @@
      以外足够远,这圈羽化边界才会一并被挤到看不见的屏幕外。 */
   .glow {
     position: fixed; inset: -20%; z-index: 0; pointer-events: none; opacity: 0;
-    /* 2026-08-04 按 Apple Music 歌词页(以及已经先改过去的"歌词窗口")重调:AM 的背景
+    /* 按 Apple Music 歌词页(以及已经先改过去的"歌词窗口")重调:AM 的背景
        是亮而饱和的——饱和度拉到 1.5、只压一层均匀的黑,不再叠原来那圈"边缘全黑"
        的重暗角(radial-gradient 到 100% accent 混黑)+brightness(.62) 的暗色调组合。
        均匀的半透明黑放在同一元素的第一层 background-image 里一起被 blur 也没关系——
@@ -416,7 +423,7 @@
   /* 上下留白 ≈ 半个视口，好让首行/末行也能滚到正中央(自动跟随与手动滑动共用)。 */
   .lyrics-inner { padding: 150px 0; }
   /* 每个歌词行可含三小行：罗马音(上)/原文(中)/翻译(下)。原文可逐字(yrc)或整行高亮。 */
-  /* Apple Music 歌词页同款景深(2026-08-04 从"active/near/其余"三档改成按距离连续
+  /* Apple Music 歌词页同款景深(从"active/near/其余"三档改成按距离连续
      衰减,跟原生"歌词窗口"同一套参数):每行的 --d(距当前行的行数差,由 syncLyrics
      维护,默认 6=远)决定不透明度(0.52-d*0.06,下限 0.3)和高斯模糊(d*1.6px,封顶
      6px)——远近感主要靠模糊量区分,不透明度差异刻意很小。当前行完全清晰、满不透明、
@@ -464,7 +471,7 @@
   .lyrics-empty .le-text { font-size: var(--fs-caption); font-weight: 600; letter-spacing: .3px; }
   :root[data-theme="light"] .lyrics-empty { color: #7a828f; }
   .lrc-w { color: #fff; }
-  /* 逐字填色改成 Apple Music 同款"白 35% → 全白"的同色渐变(2026-08-04,原来是
+  /* 逐字填色改成 Apple Music 同款"白 35% → 全白"的同色渐变(原来是
      accent-fg → 灰),跟原生"歌词窗口"的 WordKaraokeGradient 同一组参数。 */
   .lrc-line.active .lrc-w {
     --fill: 0%;
@@ -495,7 +502,7 @@
   .ic.show { display: inline-flex; }
   .ic:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .ic svg { width: 22px; height: 22px; display: block; }
-  /* 不带顶部分隔线/留白——2026-07-31 起它永远是 .secondary 卡片里的第一个模块(卡片
+  /* 不带顶部分隔线/留白——它永远是 .secondary 卡片里的第一个模块(卡片
      自己的 padding 已经留出顶部空间),不需要再跟"上面还有别的东西"这件事打交道。 */
   .history-wrap { text-align: left; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
@@ -550,7 +557,7 @@
   }
   .preview-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .preview-btn.playing { color: var(--accent-fg, #fff); border-color: color-mix(in srgb, var(--accent, #fff) 50%, transparent); background: color-mix(in srgb, var(--accent, #fff) 16%, transparent); }
-  /* ---- 表情反应(2026-07-12新增,几经改版):全站统一一份计数,跟哪首歌没关系(最初
+  /* ---- 表情反应(新增,几经改版):全站统一一份计数,跟哪首歌没关系(最初
      设计成按歌曲分开计数,用户反馈预期跟留言墙一样是全局的,当天改)。最早挂在
      .comments-wrap 里、"留言"标题正上方;2026-07-16 精简成只剩 1 个赞之后,用户反馈
      "既然只有一个的话，可以和统计次数那个放在一起，都在页面最底下"——现在跟
@@ -561,7 +568,7 @@
      评论区里那版的左对齐)。 ---- */
   .reactions-footer { margin-top: 22px; }
   .reactions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 0 0 6px; }
-  /* 2026-07-16:表情从 6 个精简成 1 个赞之后,单独一个胶囊按钮容易让人看不懂是干嘛的,
+  /* 表情从 6 个精简成 1 个赞之后,单独一个胶囊按钮容易让人看不懂是干嘛的,
      加一行小字提示——字号/颜色跟 .comments-empty 那类"页面里的次要说明文字"同一套。 */
   .reactions-hint { font-size: var(--fs-caption); color: #6b7280; margin: 0; }
   .reaction-btn {
@@ -574,7 +581,7 @@
   .reaction-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-1px); }
   .reaction-btn:disabled { opacity: .6; cursor: default; transform: none; }
   .r-count { font-size: var(--fs-micro); font-weight: 700; color: #9aa3b2; font-variant-numeric: tabular-nums; min-width: 8px; }
-  /* ---- 留言墙(2026-07-12新增):挂在 .side 里、历史列表之后,复用 .history-wrap/.history
+  /* ---- 留言墙:挂在 .side 里、历史列表之后,复用 .history-wrap/.history
      的滚动列表样式。留言内容用 textContent 渲染(见 initComments),天然防 XSS,后端不做
      二次转义(转义后再 textContent 会把 &lt; 这类符号原样显示给所有人看,是错的)。 ---- */
   /* 留言墙"常驻显示、从不加 hidden"(见 updateLayout() 附近注释),现在排在历史区/
@@ -624,7 +631,7 @@
   }
   .comment-submit:hover { background: rgba(255,255,255,.16); }
   .comment-submit:disabled { opacity: .5; cursor: default; }
-  /* ---- 历史播放 Top10 歌手(2026-07-14新增,同天用户反馈后挪到 .np 里、播放链接行
+  /* ---- 历史播放 Top10 歌手(新增,同天现象是后挪到 .np 里、播放链接行
      .links 之后——原来挂在 .side 里、留言墙之后,用户要求换到左侧播放区下方)。数据来自
      采集器一天推一次的 Last.fm 全时段(overall)播放榜(见 collector/topartists.go),不
      需要实时,不挂 60s 刷新节奏、只在页面加载时拉一次(见 initTopArtists)。跟
@@ -639,7 +646,7 @@
      了:这个面板现在整个挪进了 .secondary 那张独立卡片(跟历史/留言/表情反应/页脚一起),
      不再跟封面/歌词共用同一张卡片的网格,自然也不需要再摆回"左栏"这个位置,单纯跟着
      .secondary 的纵向堆叠顺序走。 ---- */
-  /* 2026-07-31 起排在历史区(.history-wrap)紧后面(之前是排在留言墙后面)——分隔线
+  /* 排在历史区(.history-wrap)紧后面(之前是排在留言墙后面)——分隔线
      只在历史区真的可见时才需要,历史区隐藏时 Top10歌手自己可能就是 .secondary 里
      第一个可见模块,道理跟 .comments-wrap 那条 :has() 规则一样,只是这里前面只有
      历史区一个候选,用普通的相邻兄弟选择器就够,不需要 :has()。 */
@@ -674,7 +681,7 @@
     font-size: var(--fs-micro); color: #c8cdd6; text-align: center; max-width: 100%;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* ---- 访客计数(2026-07-12新增):挂在 footer-meta 旁边(是兄弟元素,不是子元素!
+  /* ---- 访客计数:挂在 footer-meta 旁边(是兄弟元素,不是子元素!
      renderSourceMeta() 每轮 poll 都会整体覆写 #footer-meta 的 textContent,放里面会被
      反复清空)。localStorage 的 np:visited 去重:同一浏览器只在"从未访问过"时才 POST 一次。 ---- */
   .visitor-count { margin-top: 4px; font-size: var(--fs-micro); color: #6b7280; }
@@ -700,7 +707,7 @@
   :root[data-theme="light"] .lrc-main { color: #5a616e; }
   :root[data-theme="light"] .lrc-line.active .lrc-main { color: var(--accent-fg, #1c1f26); }
   :root[data-theme="light"] .lrc-w { color: #9aa1ad; }
-  /* 歌词基色 2026-08-04 改成白色系(深色/封面模糊背景用)之后,浅色主题(上面 .glow
+  /* 歌词基色改成白色系(深色/封面模糊背景用)之后,浅色主题(上面 .glow
      被关掉、背景是素净浅底)必须把逐字渐变也覆盖成深色版,不然当前行是白字白底。 */
   :root[data-theme="light"] .lrc-line.active .lrc-w {
     background-image: linear-gradient(90deg,
@@ -751,7 +758,7 @@
   :root[data-immersive] .links,
   :root[data-immersive] .secondary,
   :root[data-immersive] .album { display: none; }
-  /* 2026-07-16:.reactions 挪出 .comments-wrap、变成 .reactions-footer 包一层的独立
+  /* .reactions 挪出 .comments-wrap、变成 .reactions-footer 包一层的独立
      区块之后,不再是"父级隐藏子级自然跟着隐藏"了——这里补上一条选择器,不然沉浸模式下
      这个赞的按钮会漏网,变成沉浸模式里唯一还留着的交互控件。 */
   :root[data-immersive] .art-wrap { width: min(40vh, 360px); height: min(40vh, 360px); }
@@ -802,7 +809,7 @@
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" data-i18n-title="vinylToggleTitle" data-i18n-aria="vinylToggleAria">💿</button>
     <button id="fs-toggle" class="tool-btn" data-i18n-title="fsToggleTitle" data-i18n-aria="fsToggleAria">⛶</button>
-    <button id="lang-toggle" class="tool-btn" title="Language / 语言" aria-label="Switch language">🌐</button>
+    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option></select></label>
   </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
@@ -846,12 +853,12 @@
   <audio id="preview-audio" preload="none"></audio>
   <div class="side">
   <div id="lyrics" class="lyrics"><div id="lyrics-inner" class="lyrics-inner"></div></div>
-  <!-- 有曲目但没有任何同步歌词时的右栏占位(2026-08-04):撑住两栏布局,让 hero 卡片
+  <!-- 有曲目但没有任何同步歌词时的右栏占位:撑住两栏布局,让 hero 卡片
        不因为"没歌词"塌回窄的单栏。只在宽屏两栏模式下显示,见 .lyrics-empty 样式注释。 -->
   <div id="lyrics-empty" class="lyrics-empty hidden"><div class="le-icon">♪</div><div class="le-text" data-i18n="noSyncedLyrics">暂无同步歌词</div></div>
   </div><!-- /.side -->
 </main>
-<!-- 2026-07-31 起,封面+歌词(上面 .hero)和其它模块拆成两个独立的矩形卡片——.hero 只
+<!-- 封面+歌词(上面 .hero)和其它模块拆成两个独立的矩形卡片——.hero 只
      负责"正在播放"这一件事(封面/进度/歌词左右对齐),历史/留言/Top10歌手/表情反应/
      页脚这些跟"当下在放什么"关系不大的模块,单独收进这张 .secondary 卡片里,视觉上
      明确分开,不再挤在同一张卡片的右栏里。两栏与否只看 .hero 自己(见 updateLayout()),
@@ -893,7 +900,7 @@
   <!-- 内容由 renderSourceMeta() 每轮 poll 覆写;初始留空,别写死某个播放器名 -->
   <div id="footer-meta" class="meta"></div>
   <div id="visitor-count" class="visitor-count hidden" data-i18n-title="visitorCountTitle" title="同一浏览器只计一次;清除缓存/换浏览器/无痕模式会重新计入一次"></div>
-  <!-- 2026-08-24 加:这个页面是 Lyrimuse 项目对外分发的一个真实曝光点,之前完全没有可见
+  <!-- 加:这个页面是 Lyrimuse 项目对外分发的一个真实曝光点,之前完全没有可见
        的署名/链接(唯一提到 Lyrimuse 的地方是一行 JS 注释,访客看不到)。跟 visitor-count
        同款极简页脚小字处理,不抢视觉。 -->
   <div class="credit"><span data-i18n="poweredByPrefix"></span><a href="https://github.com/Yudaotor/lyrimuse" target="_blank" rel="noopener">Lyrimuse</a><span data-i18n="poweredBySuffix"></span></div>
@@ -907,7 +914,7 @@
   // 主数据源:自建状态中继(Cloudflare Worker+KV,采集器直推,国内可达且不受 LB 抽风影响)。
   // 读 /now(当前)+ /history(历史)。可 ?relay= 覆盖;设 ?relay=off 则退回直连 LB。
   const RELAY = (() => { const r = params.get('relay'); if (r === 'off') return ''; return r || 'https://np.yudaotor.me'; })();
-  // 最近播放列表改读 Last.fm(2026-08-07)。只有这一块换源 —— 正在播放/进度条/歌词、
+  // 最近播放列表改读 Last.fm。只有这一块换源 —— 正在播放/进度条/歌词、
   // 今日统计、月度日历仍旧读 ListenBrainz,那边有 Last.fm 给不了的东西(播放位置、
   // additional_info 里的时长)。
   //
@@ -936,7 +943,7 @@
 
   const el = id => document.getElementById(id);
 
-  // ---- 中英双语(2026-07-21新增) ----
+  // ---- 中英双语 ----
   // 纯 vanilla JS,没有任何框架托底的响应式机制——语言切换时不会有任何东西"自动"
   // 重新渲染,必须显式做。这里踩过跟 Lyrimuse(Swift App)那边 SwiftUI 一模一样的坑:
   // 历史/留言这类内容各自有"内容没变就跳过重建"的签名去重(historySig/comments 内部的
@@ -979,6 +986,108 @@
       pageViews: n => `页面访问次数：${n}`,
       artistPlayCount: (name, n) => `${name} · ${n} 次播放`,
     },
+    'zh-Hant': {
+      docTitleIdle: '正在聽什麼 ♪',
+      moreSettings: '更多設定', expandSettings: '展開設定',
+      switchTheme: '切換主題',
+      vinylToggleTitle: '黑膠 / 方形 切換', vinylToggleAria: '黑膠/方形切換',
+      fsToggleTitle: '沉浸 / 全螢幕模式', fsToggleAria: '沉浸全螢幕模式',
+      themeAuto: '氛圍', themeLight: '淺色', themeTitlePrefix: '主題：', themeTitleSuffix: '（點按切換）',
+      previewAria: '試聽 30 秒', previewTitle: '試聽 30 秒（iTunes 預覽）',
+      recentPlays: '最近播放', colTitle: '歌名', colAlbum: '專輯', colArtist: '歌手', col30d: '30天',
+      comments: '留言', namePlaceholder: '暱稱(選填)', textPlaceholder: '留句話…', send: '傳送',
+      noComments: '還沒有留言,來寫第一則吧', anonymous: '匿名',
+      topArtists: '歷史播放 Top10 歌手', topArtistsUpdated: t => `更新於 · ${t}`,
+      reactionsHint: '覺得有趣可以按個讚喔',
+      visitorCountTitle: '同一瀏覽器只計一次;清除快取/換瀏覽器/無痕模式會重新計入一次',
+      poweredByPrefix: '由 ', poweredBySuffix: ' 驅動',
+      justNow: '剛剛', minutesAgo: n => `${n} 分鐘前`, hoursAgo: n => `${n} 小時前`, daysAgo: n => `${n} 天前`,
+      unknownTrack: '未知曲目', nowPlaying: '他正在播放', paused: '已暫停',
+      lastPlayed: t => `上次播放 · ${t}`, recentlyPlayed: '最近播放',
+      updating: '更新中…',
+      sourceNetease: '網易雲音樂', sourceQQ: 'QQ音樂', sourceKugou: '酷狗音樂', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: '酷我音樂', sourceMigu: '咪咕音樂', sourceSoda: '汽水音樂', sourceLocalFile: '本機歌詞檔案', sourceLX: '洛雪音樂',
+      coverLyricsVia: s => `封面歌詞來自${s}`, coverVia: s => `封面來自${s}`, lyricsVia: s => `歌詞來自${s}`,
+      playedNTimes: n => `近30天播放 ${n} 次`,
+      hoursMins: (h, m) => `${h} 小時 ${m} 分`, minsOnly: m => `${m} 分`, approx: '約 ',
+      todayStat: (count, dur) => `今日 · ${count} 首 · ${dur}`,
+      earlier: '更早',
+      nothingPlaying: '暫無播放', quietRightNow: '這會兒很安靜',
+      noSyncedLyrics: '暫無同步歌詞',
+      notConfigured: '頁面未設定：URL 需帶 ?user=<ListenBrainz使用者名稱>',
+      noListensYet: '還沒有任何收聽記錄',
+      connectingRetry: '連線中…稍後自動重試', connecting: '連線中…',
+      pageViews: n => `頁面瀏覽次數：${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n} 次播放`,
+    },
+    ja: {
+      docTitleIdle: 'いま聴いている曲 ♪',
+      moreSettings: 'その他の設定', expandSettings: '設定を開く',
+      switchTheme: 'テーマを切り替え',
+      vinylToggleTitle: 'レコード / スクエア切り替え', vinylToggleAria: 'レコード/スクエア切り替え',
+      fsToggleTitle: '没入 / フルスクリーンモード', fsToggleAria: '没入フルスクリーンモード',
+      themeAuto: 'アンビエント', themeLight: 'ライト', themeTitlePrefix: 'テーマ：', themeTitleSuffix: '（クリックで切り替え）',
+      previewAria: '30秒試聴', previewTitle: '30秒試聴（iTunesプレビュー）',
+      recentPlays: '最近再生した曲', colTitle: '曲名', colAlbum: 'アルバム', colArtist: 'アーティスト', col30d: '30日',
+      comments: 'コメント', namePlaceholder: 'ニックネーム（任意）', textPlaceholder: 'ひとことどうぞ…', send: '送信',
+      noComments: 'まだコメントはありません。最初のひとことをどうぞ', anonymous: '匿名',
+      topArtists: '再生回数トップ10アーティスト（全期間）', topArtistsUpdated: t => `更新 · ${t}`,
+      reactionsHint: '気に入ったら ❤️ をどうぞ',
+      visitorCountTitle: '同じブラウザでは1回だけ数えます。キャッシュの消去、別のブラウザ、プライベートモードでは再度数えます',
+      poweredByPrefix: 'Powered by ', poweredBySuffix: '',
+      justNow: 'たった今', minutesAgo: n => `${n}分前`, hoursAgo: n => `${n}時間前`, daysAgo: n => `${n}日前`,
+      unknownTrack: '不明な曲', nowPlaying: '再生中', paused: '一時停止中',
+      lastPlayed: t => `最後に再生 · ${t}`, recentlyPlayed: '最近再生',
+      updating: '更新中…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'ローカルの歌詞ファイル', sourceLX: 'LX Music',
+      coverLyricsVia: s => `アートワークと歌詞：${s}`, coverVia: s => `アートワーク：${s}`, lyricsVia: s => `歌詞：${s}`,
+      playedNTimes: n => `過去30日間に${n}回再生`,
+      hoursMins: (h, m) => `${h}時間${m}分`, minsOnly: m => `${m}分`, approx: '約',
+      todayStat: (count, dur) => `今日 · ${count}曲 · ${dur}`,
+      earlier: 'それ以前',
+      nothingPlaying: '再生していません', quietRightNow: 'いまは静かです',
+      noSyncedLyrics: '同期歌詞はありません',
+      notConfigured: 'ページが設定されていません：URLに ?user=<ListenBrainzのユーザ名> が必要です',
+      noListensYet: 'まだ再生履歴がありません',
+      connectingRetry: '接続中…自動で再試行します', connecting: '接続中…',
+      pageViews: n => `ページビュー：${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n}回再生`,
+    },
+    ko: {
+      docTitleIdle: '지금 듣는 음악 ♪',
+      moreSettings: '설정 더 보기', expandSettings: '설정 펼치기',
+      switchTheme: '테마 전환',
+      vinylToggleTitle: 'LP / 정사각형 전환', vinylToggleAria: 'LP/정사각형 전환',
+      fsToggleTitle: '몰입 / 전체 화면 모드', fsToggleAria: '몰입 전체 화면 모드',
+      themeAuto: '앰비언트', themeLight: '라이트', themeTitlePrefix: '테마: ', themeTitleSuffix: ' (클릭하여 전환)',
+      previewAria: '30초 미리 듣기', previewTitle: '30초 미리 듣기(iTunes 미리 듣기)',
+      recentPlays: '최근 재생', colTitle: '제목', colAlbum: '앨범', colArtist: '아티스트', col30d: '30일',
+      comments: '댓글', namePlaceholder: '닉네임(선택)', textPlaceholder: '한마디 남겨 주세요…', send: '보내기',
+      noComments: '아직 댓글이 없습니다. 첫 댓글을 남겨 보세요', anonymous: '익명',
+      topArtists: '전체 기간 Top 10 아티스트', topArtistsUpdated: t => `업데이트 · ${t}`,
+      reactionsHint: '마음에 들면 ❤️를 눌러 주세요',
+      visitorCountTitle: '같은 브라우저에서는 한 번만 셉니다. 캐시를 지우거나 다른 브라우저, 시크릿 모드에서는 다시 셉니다',
+      poweredByPrefix: 'Powered by ', poweredBySuffix: '',
+      justNow: '방금', minutesAgo: n => `${n}분 전`, hoursAgo: n => `${n}시간 전`, daysAgo: n => `${n}일 전`,
+      unknownTrack: '알 수 없는 노래', nowPlaying: '재생 중', paused: '일시 정지됨',
+      lastPlayed: t => `마지막 재생 · ${t}`, recentlyPlayed: '최근 재생',
+      updating: '업데이트 중…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: '로컬 가사 파일', sourceLX: 'LX Music',
+      coverLyricsVia: s => `아트워크 및 가사: ${s}`, coverVia: s => `아트워크: ${s}`, lyricsVia: s => `가사: ${s}`,
+      playedNTimes: n => `최근 30일간 ${n}회 재생`,
+      hoursMins: (h, m) => `${h}시간 ${m}분`, minsOnly: m => `${m}분`, approx: '약 ',
+      todayStat: (count, dur) => `오늘 · ${count}곡 · ${dur}`,
+      earlier: '이전',
+      nothingPlaying: '재생 중인 음악 없음', quietRightNow: '지금은 조용합니다',
+      noSyncedLyrics: '동기화된 가사 없음',
+      notConfigured: '페이지가 설정되지 않았습니다: URL에 ?user=<ListenBrainz 사용자 이름>이 필요합니다',
+      noListensYet: '아직 재생 기록이 없습니다',
+      connectingRetry: '연결 중… 자동으로 다시 시도합니다', connecting: '연결 중…',
+      pageViews: n => `페이지 조회수: ${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n}회 재생`,
+    },
     en: {
       docTitleIdle: 'Now Playing ♪',
       moreSettings: 'More settings', expandSettings: 'Expand settings',
@@ -1015,20 +1124,39 @@
     },
   };
   const LANG_KEY = 'npLang';
+  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko'];
+  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko' };
+  // 浏览器语言标签对到页面语言:繁体看 Hant 或港澳台地区,其余中文算简体;认不出来返回 null。
+  function langFor(tag) {
+    const l = String(tag || '').toLowerCase();
+    if (l === 'zh' || l.startsWith('zh-')) return /-hant\b|-(tw|hk|mo)\b/.test(l) && !/-hans\b/.test(l) ? 'zh-Hant' : 'zh';
+    for (const code of ['ja', 'ko', 'en']) if (l === code || l.startsWith(code + '-')) return code;
+    return null;
+  }
+  // 记住的选择优先;否则按浏览器首选语言列表逐个找,都不认识就用英文。
   function detectLang() {
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      if (saved === 'zh' || saved === 'en') return saved;
+      if (LANGS.includes(saved)) return saved;
     } catch (e) {}
-    return (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+    const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    for (const tag of prefs) {
+      const lang = langFor(tag);
+      if (lang) return lang;
+    }
+    return 'en';
   }
   let currentLang = detectLang();
   function t(key, ...args) {
-    const entry = (STRINGS[currentLang] || STRINGS.zh)[key];
+    let entry = (STRINGS[currentLang] || STRINGS.en)[key];
+    if (entry === undefined) entry = STRINGS.en[key];
     if (entry === undefined) return key;
     return typeof entry === 'function' ? entry(...args) : entry;
   }
   function applyStaticI18n() {
+    document.documentElement.lang = HTML_LANG[currentLang] || 'en';
+    const langSelect = el('lang-select');
+    if (langSelect) langSelect.value = currentLang;
     document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
     document.querySelectorAll('[data-i18n-title]').forEach(e => { e.title = t(e.dataset.i18nTitle); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(e => { e.placeholder = t(e.dataset.i18nPlaceholder); });
@@ -1162,7 +1290,7 @@
   function saveLive(s) { try { localStorage.setItem(LIVE_KEY, JSON.stringify({ ...s, seenAt: Date.now() })); } catch (e) {} }
   function loadLive() { try { return JSON.parse(localStorage.getItem(LIVE_KEY) || 'null'); } catch (e) { return null; } }
 
-  // 可选内容模块开关(2026-07-16新增):站长可在后端配置关掉历史/留言/表情/访客计数/
+  // 可选内容模块开关:站长可在后端配置关掉历史/留言/表情/访客计数/
   // Top10歌手 五个模块中的任意几个,配置随 GET {RELAY}/now 的 modules 字段下发(见
   // fetchState()/tick())。先用 localStorage 缓存的上一份配置铺一次(首屏不用空等真实
   // 网络响应),等 tick() 拿到新配置再刷新一遍——跟 np:last/np:lastHistory 同一套
@@ -1182,7 +1310,7 @@
   // 禁用的模块强制隐藏(.hidden);启用的模块这里绝不主动摘掉 hidden——那是各模块自己
   // 内容驱动逻辑的地盘(比如 renderHistory 空列表时自己隐藏、initTopArtists/
   // initVisitorCounter 只在异步拿到非空结果后才显示),这里跟它们抢摘 hidden 会把"真的
-  // 没内容"的模块强行摆出来,详见文件顶部这次改动的设计说明。
+  // 没内容"的模块强行摆出来,详见文件顶部的设计说明。
   function applyModuleVisibility() {
     const wrapIds = {
       history: 'history-wrap', comments: 'comments-wrap', topArtists: 'top-artists-wrap',
@@ -1204,7 +1332,7 @@
   // sameTrack 上,会导致缓存渲染那次刚请求到的兜底图,被紧接着的真实数据渲染(服务端仍
   // 无封面)误判成"这首歌不用再管封面"而跳过更新,然后又被下面"服务端值跟当前显示值不
   // 一样就同步"的逻辑当成"服务端确认没有"直接清空——图片等于先显示了一下又被自己清掉
-  // (实测坐实:2026-07-10)。
+  // (实测坐实)。
   let fallbackTriedKey = '';
   // 换成新曲目、这一轮暂时没封面(服务端 enrich 还没跑完、客户端 iTunes 兜底也没搜到)时,
   // 不立刻拍黑清空,先记一个延迟清空定时器——多等一轮 poll(POLL_MS + 余量),真封面几乎
@@ -1244,11 +1372,11 @@
     const key = `${artist}|${title}`;
     const sameTrack = key === curKey;
     curKey = key;
-    // ⚠️ 只认浏览器真加载得动的图。采集器 2026-08-31 起可能给出设备直送封面的
+    // ⚠️ 只认浏览器真加载得动的图。采集器可能给出设备直送封面的
     // file:///Users/<用户名>/… 本地路径 —— 那是**采集器那台机器**上的文件,这里永远
     // 读不到。而下面那条 iTunes 兜底的闸是 `if (!art)`,file:// 是个非空字符串,会
     // 大摇大摆地绕过兜底、直接被塞进 <img src>,表现就是"封面整块空白、其它一切正常"
-    // (2026-09-02 用户报)。采集器侧已经改成把图托管到中继、对外只发 https(见
+    // (现象是)。采集器侧已经改成把图托管到中继、对外只发 https(见
     // collector artworkrelay.go),这里是第二道:ListenBrainz 里**已经存下**的那两天
     // 历史记录仍然带着 file://,走 fromLB 兜底那条路时还会回到这儿来。
     let art = /^https?:\/\//i.test(s.artwork || '') ? s.artwork : '';
@@ -1271,7 +1399,7 @@
     // 不能被"同一首歌不再更新图"的判断卡死——所以拿到非空封面时不看 sameTrack,只看"这轮
     // 拿到的跟当前实际显示的是不是同一张"。但服务端汇报"这首歌没有封面"(art 为空)时,只有
     // 真的换了新曲目才清空——同一首歌服务端还没解析出来,不该把已经在展示的图(不管是服务端
-    // 给的还是客户端兜底的)撤掉(实测坐实:2026-07-10,这条清空分支曾经把刚兜底成功的图冲掉)。
+    // 给的还是客户端兜底的)撤掉(实测坐实:,这条清空分支曾经把刚兜底成功的图冲掉)。
     if (art) {
       if (art !== lastAppliedArt) {
         imgEl.src = art;
@@ -1283,7 +1411,7 @@
     } else if (!sameTrack) {
       // 刚换的这首暂时没封面:先留着上一首的封面/背景不动,给服务端一轮 poll 的时间把真
       // 封面带回来(上面 art 非空分支不看 sameTrack,拿到就会立刻覆盖)——避免"切歌瞬间
-      // 拍黑、几秒后又突然恢复"这种视觉突兀(实测坐实:2026-07-11,POLL_MS=10s 时旧逻辑
+      // 拍黑、几秒后又突然恢复"这种视觉突兀(实测坐实:,POLL_MS=10s 时旧逻辑
       // 换歌立刻清空,期间背景/封面直接露出纯黑底)。真等满一轮 poll 还是没有才兜底清空。
       // 每次真的换新曲目(!sameTrack 只在 key 变化的那一次为真)都重新起一个定时器、顶掉
       // 上一个还没触发的——不会因为快速连续切歌而漏排上新曲目自己的兜底清空。
@@ -1341,7 +1469,7 @@
   // --accent-fg 专供进度条/歌词高亮这类必须让人一眼认出来的前景文字用:饱和度统一拉高
   // 保证"看得出这是个颜色",亮度按当前主题往跟卡片底色的模糊/半透明背景相反的方向夹
   // (氛围底默认主题卡片整体偏暗,前景推亮;浅色主题卡片整体偏白,前景推暗),避免前景
-  // 跟卡片自己的底色亮度太接近、糊在一起分不清(2026-07-30 用户实测反馈)。
+  // 跟卡片自己的底色亮度太接近、糊在一起分不清(现象是)。
   function accentFgHsl(h, s, l) {
     const isLight = document.documentElement.dataset.theme === 'light';
     const S = Math.min(90, Math.max(60, s));
@@ -1566,7 +1694,7 @@
     if (statDone) { getMonthCounts().then(applyMonthCounts).catch(() => {}); return; }
     // 优先中继 /history:已是归一化条目 {title,artist,listenedAt,durationMs,url},最多 200 条,
     // 足够覆盖一天。中继不通才回退直连 LB(含翻页)。
-    // album 字段(2026-07-31 新增专辑列)由 state-worker(另一个仓库 Yudaotor/
+    // album 字段(新增专辑列)由 state-worker(另一个仓库 Yudaotor/
     // nowplaying-workers)的 lbHistory() 提供——它原本只归一化 title/artist/listenedAt/
     // durationMs/device/url,漏了 album,已经在那边补上(读 release_name)并重新部署,
     // 这里读 x.album 现在能拿到真实值。
@@ -1623,8 +1751,8 @@
     }
     return acc;
   }
-  // 近30天每首歌播放次数。2026-07-31 之前这里直接在浏览器里翻页拉 LB(最多15页)统计,
-  // 用户反馈"体感非常慢"——国内直连 LB 本来就慢(这正是整个 relay 存在的理由),还要
+  // 近30天每首歌播放次数。之前这里直接在浏览器里翻页拉 LB(最多15页)统计,
+  // 现象是"体感非常慢"——国内直连 LB 本来就慢(这正是整个 relay 存在的理由),还要
   // 浏览器顺序等每一页依次返回。已经把这份翻页统计挪到 state-worker 的 /month-counts
   // 端点(服务端算 + KV 缓存15分钟,所有访客共享同一份结果,不用各自重新翻页),这里
   // 优先读那个快得多的端点;中继不通/没配置 RELAY 时才退回原来这段直连 LB 翻页的兜底
@@ -1945,7 +2073,7 @@
     const a = lrcLines[i] && lrcLines[i].el;
     if (!a) return;
     // 当前行定位在视口偏上 38% 处而不是正中——Apple Music 歌词页的定位(上面留少量
-    // 已唱过的行,下面留更多即将到来的行),2026-08-04 跟原生"歌词窗口"一起改过来。
+    // 已唱过的行,下面留更多即将到来的行),跟原生"歌词窗口"一起改过来。
     const top = Math.max(0, a.offsetTop + a.clientHeight / 2 - box.clientHeight * 0.38);
     box.scrollTo({ top, behavior: smooth && lrcSmooth() ? 'smooth' : 'auto' });
   }
@@ -1968,7 +2096,8 @@
       const line = raw.trim();
       const tags = [...line.matchAll(/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g)];
       if (!tags.length) continue;
-      const txt = line.replace(/\[[^\]]*\]/g, '').trim();
+      // 两层方括号的段落标记([[Verse 1]],有时夹在两句中间)整段换成一个空格,再剥别的 [...];同 Swift LRCParser
+      const txt = line.replace(/\s*(?:\[\[[^\[\]]*\]\]\s*)+/g, ' ').replace(/\[[^\]]*\]/g, '').trim();
       if (!txt) continue; // 跳过纯标签/元信息行([ti:]、[by:] 等)
       for (const m of tags) {
         const frac = m[3] ? +(m[3] + '00').slice(0, 3) : 0;
@@ -2008,7 +2137,7 @@
         const tr = parseLRC(s.lyricsTr), roma = parseLRC(s.lyricsRoma), yrc = parseYRC(s.lyricsYRC);
         const base = yrc.length ? yrc : parseLRC(s.lyrics); // 有逐字用 yrc，否则用原文逐行
         // 歌词自带的 [offset:±毫秒](LRC 规范：正数=歌词整体提前显示，显示时刻=时间戳−offset)。
-        // 桌面端 2026-08-22 起就在消费它(LRCParser.parseOffsetMs)，网页端一直漏——2026-09-01
+        // 桌面端就在消费它(LRCParser.parseOffsetMs)，网页端一直漏——
         // 全链路核对时补齐，语义与桌面端逐条对齐：LRC 为 0 再看 YRC(酷狗 KRC 母版转出的
         // .lrc/.yrc 头部带同一个值)、只取第一个标签(文件头部才是元信息区)、|值|>10 秒当 0
         // (畸形数据闸,同桌面端 maxOffsetMs)。译文/罗马音按**原始**时间戳配对(它们抄的是
@@ -2050,11 +2179,11 @@
       // 匹配不到任何行 → syncLyrics 给 #lyrics 挂 .no-active,整片轻淡静态展示。
       syncLyrics(typeof s.progressMs === 'number' && s.progressMs > 0 ? s.progressMs : -1);
     }
-    // 有曲目但没有任何歌词 → 右栏占位,让 hero 卡片保持两栏大小(用户点名:暂停/没歌词
+    // 有曲目但没有任何歌词 → 右栏占位,让 hero 卡片保持两栏大小(暂停/没歌词
     // 时卡片不该塌回窄单栏)。没有曲目(页面空闲态)两个都不显示,回到单栏。
     empty.classList.toggle('hidden', !(s && !show));
     updateLayout();
-    // 布局落定之后再定位一次,而且用 instant——2026-08-05 用户反馈"暂停时刷新进去,歌词
+    // 布局落定之后再定位一次,而且用 instant——现象是"暂停时刷新进去,歌词
     // 停在最上方而不是暂停那一行"的根因就在这里,两个问题叠在一起:
     // ① 上面 syncLyrics 里的 lrcScrollActive 跑在 updateLayout() **之前**,那时 .two-col
     //    还没加上、#lyrics 也还没被 syncHeroLyricsHeight 写上真实高度,吃的是 .lyrics 基础
@@ -2068,7 +2197,7 @@
     // 头一路滚过去。
     if (show && !syncable && !lrcUserScrolling) lrcScrollActive(false);
   }
-  // 2026-07-31 起 .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏看右栏有没有
+  // .hero 只剩封面(.np)和歌词(.side)两个区域,是否铺两栏看右栏有没有
   // 内容(歌词或"暂无歌词"占位)——历史/留言墙/Top10歌手已经拆到 .secondary 那张独立
   // 卡片里(见旁边 HTML/CSS 注释),不再参与这个判断。
   function updateLayout() {
@@ -2136,7 +2265,7 @@
     const wrapEl = el('lyrics');
     if (wrapEl.classList.contains('no-active') !== (idx < 0)) wrapEl.classList.toggle('no-active', idx < 0);
     if (idx !== lrcActive) {
-      // Apple Music 式按距离连续衰减的景深(2026-08-04,配合 CSS .lrc-line 的 --d
+      // Apple Music 式按距离连续衰减的景深(配合 CSS .lrc-line 的 --d
       // 变量):只维护新旧 active ±LRC_DEPTH 范围内每行的 --d,不用扫全表——超出这个
       // 范围的行没被设置过 --d,吃 CSS 默认值 6(=最远档),视觉上跟第 7 行以外完全
       // 一致,清理时 removeProperty 让它们回落到同一个默认值即可。
@@ -2260,7 +2389,7 @@
           return { title: d.title, artist: d.artist, album: d.album, playing: d.playing, listenedAt: d.listenedAt,
             // current:服务端显式标注这是 Mac/iPhone 此刻活跃的曲目(哪怕暂停),不是纯历史
             // fallback——paint() 据此判断"已暂停"(见那边注释);之前这里漏传,"已暂停"分支
-            // 因此一直进不去,暂停时只能落到通用的"最近播放"(实测坐实:2026-07-10)。
+            // 因此一直进不去,暂停时只能落到通用的"最近播放"(实测坐实)。
             current: d.current,
             artwork: d.artwork || '', accent: d.accent || '', source: d.device || '',
             lyrics: d.lyrics || '', lyricsTr: d.lyricsTr || '', lyricsRoma: d.lyricsRoma || '', lyricsYRC: d.lyricsYRC || '',
@@ -2452,7 +2581,7 @@
     window.__vinylSpinRefresh = apply; // 黑胶/方形切换后重新评估
   })();
 
-  // 工具钮抽屉(2026-07-31 起不分宽窄屏一律生效,见 .tools/.tools-toggle 的 CSS):
+  // 工具钮抽屉(不分宽窄屏一律生效,见 .tools/.tools-toggle 的 CSS):
   // 点"⋯"展开/收起下面三个真正的按钮,再点一次或点抽屉外任意位置收起。
   (function initToolsDrawer() {
     const wrap = el('tools'), toggle = el('tools-toggle');
@@ -2538,16 +2667,19 @@
     });
   })();
 
-  // 语言切换(🌐 钮):在 zh/en 之间切换,setLang() 内部会处理持久化+静态文案+动态内容重绘。
+  // 语言切换(🌐 钮,盖着一个透明下拉框):选中后 setLang() 处理持久化+静态文案+动态内容重绘。
   (function initLangToggle() {
     const btn = el('lang-toggle');
     if (!btn) return;
-    btn.addEventListener('click', () => setLang(currentLang === 'zh' ? 'en' : 'zh'));
+    const select = el('lang-select');
+    if (!select) return;
+    select.value = currentLang;
+    select.addEventListener('change', () => setLang(select.value));
   })();
 
-  // 访客计数(2026-07-12新增):localStorage 的 np:visited 去重——没这个标记就 POST 一次
+  // 访客计数:localStorage 的 np:visited 去重——没这个标记就 POST 一次
   // (后端 +1 并返回总数),打上标记;有标记就只 GET 读总数,不再增加。清缓存/换浏览器/
-  // 无痕模式会被重新计入,是用户自己要求的方案,接受这个已知代价。
+  // 无痕模式会被重新计入,这是已知且接受的代价。
   (function initVisitorCounter() {
     const elm = el('visitor-count');
     if (!elm || !RELAY || !moduleConfig.visitorCount) return;
@@ -2555,7 +2687,7 @@
     let lastTotal = null;
     const paintTotal = () => {
       if (lastTotal === null) return;
-      elm.textContent = t('pageViews', lastTotal.toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US'));
+      elm.textContent = t('pageViews', lastTotal.toLocaleString(HTML_LANG[currentLang] || 'en'));
     };
     window.__refreshVisitorCount = paintTotal;
     (async () => {
@@ -2572,12 +2704,12 @@
     })();
   })();
 
-  // 表情反应(2026-07-12新增,当天改成全局):最初设计成按当前歌曲分开计数,用户反馈
+  // 表情反应(新增,当天改成全局):最初设计成按当前歌曲分开计数,现象是
   // 预期跟留言墙一样是全站统一一份、跟哪首歌没关系,改成一次性加载 + 跟留言墙共用 60s
   // 刷新节奏(见 bootstrap 的 window.__fetchComments 那行,一并调用)。真正防刷在后端,
   // 这里的按钮禁用只是防误触双击。
   (function initReactions() {
-    // 2026-07-16:用户反馈"不需要这样吧"——六个表情选项太多余,只留一个赞就够,选 ❤️
+    // 现象是"不需要这样吧"——六个表情选项太多余,只留一个赞就够,选 ❤️
     // 是因为它已经攒了真实点击数据(改之前線上就是排最前、已经有人点过的那个),换掉会
     // 白丢这份数据。REACTION_EMOJI 保留数组形态(虽然现在只有一个元素)是刻意的——下面
     // 建按钮/计数的循环逻辑不用跟着改,以后万一想恢复多个表情,加回数组元素就行。
@@ -2618,7 +2750,7 @@
     fetchReactions();
   })();
 
-  // 留言墙(2026-07-12新增):挂在 .side 里,历史列表之后。渲染全程用 textContent/
+  // 留言墙:挂在 .side 里,历史列表之后。渲染全程用 textContent/
   // createElement(不用 innerHTML),后端也不做转义——两边配合天然防 XSS(见 CSS 里
   // .comments-wrap 上方注释)。跟历史列表共用 60s 刷新节奏(见 bootstrap),不单独起轮询。
   (function initComments() {
@@ -2673,8 +2805,8 @@
     fetchComments();
   })();
 
-  // 历史播放 Top10 歌手(2026-07-14新增):数据来自采集器一天推一次的 Last.fm 全时段
-  // (overall)播放榜(见 collector/topartists.go 的 topArtistsDigest),用户明确要求
+  // 历史播放 Top10 歌手:数据来自采集器一天推一次的 Last.fm 全时段
+  // (overall)播放榜(见 collector/topartists.go 的 topArtistsDigest),
   // "不用实时更新,每天更新一次就好"——所以故意只在页面加载时拉一次,不挂进下面
   // fetchHistory/fetchComments/fetchReactions 共用的 60s 刷新节奏:那样做只会每分钟
   // 白打一次 KV 读请求换回同一份数据(采集器一天才写一次),纯粹浪费。头像由采集器解析:

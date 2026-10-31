@@ -4,9 +4,9 @@
 
 A single self-contained HTML file that shows what you're currently (or most recently)
 listening to on Apple Music, pulled from [ListenBrainz](https://listenbrainz.org/).
-Bilingual out of the box — it auto-detects the visitor's browser language (Chinese /
-English) and lets them switch manually with the 🌐 button; the choice is remembered
-across visits.
+Five UI languages out of the box (English, Simplified and Traditional Chinese, Japanese,
+Korean) — it follows the visitor's browser languages, falls back to English, and lets them
+switch with the 🌐 menu; the choice is remembered across visits.
 
 This `demo/` folder is a separate, genericized copy of the page this repo's own
 maintainer runs in production (`../index.html`) — it has no personal relay URL,
