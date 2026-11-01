@@ -710,7 +710,7 @@
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" data-i18n-title="vinylToggleTitle" data-i18n-aria="vinylToggleAria">💿</button>
     <button id="fs-toggle" class="tool-btn" data-i18n-title="fsToggleTitle" data-i18n-aria="fsToggleAria">⛶</button>
-    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option></select></label>
+    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option></select></label>
   </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
@@ -995,6 +995,40 @@
       pageViews: n => `Visitas a la página: ${n}`,
       artistPlayCount: (name, n) => `${name} · ${n} ${n === 1 ? 'reproducción' : 'reproducciones'}`,
     },
+    fr: {
+      docTitleIdle: 'En écoute ♪',
+      moreSettings: 'Plus de réglages', expandSettings: 'Afficher les réglages',
+      switchTheme: 'Changer de thème',
+      vinylToggleTitle: 'Vinyle / Carré', vinylToggleAria: 'Vinyle/Carré',
+      fsToggleTitle: 'Mode immersif / Plein écran', fsToggleAria: 'Mode immersif plein écran',
+      themeAuto: 'Ambiance', themeLight: 'Clair', themeTitlePrefix: 'Thème\u00a0: ', themeTitleSuffix: ' (cliquez pour changer)',
+      previewAria: 'Extrait de 30 s', previewTitle: 'Extrait de 30 secondes (via iTunes)',
+      recentPlays: 'Écoutés récemment', colTitle: 'Titre', colAlbum: 'Album', colArtist: 'Artiste', col30d: '30 j',
+      comments: 'Commentaires', namePlaceholder: 'Nom', textPlaceholder: 'Écrivez quelque chose…', send: 'Envoyer',
+      noComments: 'Aucun commentaire pour l’instant. Soyez le premier\u00a0!', anonymous: 'Anonyme',
+      topArtists: 'Top 10 artistes (depuis toujours)', topArtistsUpdated: t => `Mis à jour · ${t}`,
+      reactionsHint: 'Touchez ❤️ si vous aimez',
+      visitorCountTitle: 'Compté une fois par navigateur\u00a0; vider le cache, changer de navigateur ou passer en navigation privée compte à nouveau',
+      poweredByPrefix: 'Propulsé par ', poweredBySuffix: '',
+      justNow: 'à l’instant', minutesAgo: n => `il y a ${n} min`, hoursAgo: n => `il y a ${n} h`, daysAgo: n => `il y a ${n} j`,
+      unknownTrack: 'Morceau inconnu', nowPlaying: 'En lecture', paused: 'En pause',
+      lastPlayed: t => `Dernière écoute · ${t}`, recentlyPlayed: 'Écoutés récemment',
+      updating: 'Mise à jour…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'un fichier de paroles local', sourceLX: 'LX Music',
+      coverLyricsVia: s => `Pochette et paroles via ${s}`, coverVia: s => `Pochette via ${s}`, lyricsVia: s => `Paroles via ${s}`,
+      playedNTimes: n => (n <= 1 ? `${n} écoute ces 30 derniers jours` : `${n} écoutes ces 30 derniers jours`),
+      hoursMins: (h, m) => `${h} h ${m} min`, minsOnly: m => `${m} min`, approx: '~ ',
+      todayStat: (count, dur) => `Aujourd’hui · ${count} ${count <= 1 ? 'morceau' : 'morceaux'} · ${dur}`,
+      earlier: 'Plus tôt',
+      nothingPlaying: 'Rien en lecture', quietRightNow: 'C’est calme pour le moment',
+      noSyncedLyrics: 'Pas de paroles synchronisées',
+      notConfigured: 'Page non configurée\u00a0: l’URL doit contenir ?user=<nom d’utilisateur ListenBrainz>',
+      noListensYet: 'Aucun historique d’écoute pour l’instant',
+      connectingRetry: 'Connexion… nouvel essai automatique', connecting: 'Connexion…',
+      pageViews: n => `Vues de la page\u00a0: ${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n} ${n <= 1 ? 'écoute' : 'écoutes'}`,
+    },
     en: {
       docTitleIdle: 'Now Playing ♪',
       moreSettings: 'More settings', expandSettings: 'Expand settings',
@@ -1029,13 +1063,13 @@
     },
   };
   const LANG_KEY = 'npLang';
-  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es'];
-  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es' };
+  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr'];
+  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr' };
   // 浏览器语言标签对到页面语言:繁体看 Hant 或港澳台地区,其余中文算简体;认不出来返回 null。
   function langFor(tag) {
     const l = String(tag || '').toLowerCase();
     if (l === 'zh' || l.startsWith('zh-')) return /-hant\b|-(tw|hk|mo)\b/.test(l) && !/-hans\b/.test(l) ? 'zh-Hant' : 'zh';
-    for (const code of ['ja', 'ko', 'es', 'en']) if (l === code || l.startsWith(code + '-')) return code;
+    for (const code of ['ja', 'ko', 'es', 'fr', 'en']) if (l === code || l.startsWith(code + '-')) return code;
     return null;
   }
   // 记住的选择优先;否则按浏览器首选语言列表逐个找,都不认识就用英文。
