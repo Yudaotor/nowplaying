@@ -809,7 +809,7 @@
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" data-i18n-title="vinylToggleTitle" data-i18n-aria="vinylToggleAria">💿</button>
     <button id="fs-toggle" class="tool-btn" data-i18n-title="fsToggleTitle" data-i18n-aria="fsToggleAria">⛶</button>
-    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option></select></label>
+    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option></select></label>
   </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
@@ -1190,6 +1190,40 @@
       pageViews: n => `Seitenaufrufe: ${n}`,
       artistPlayCount: (name, n) => `${name} · ${n} ${n === 1 ? 'Wiedergabe' : 'Wiedergaben'}`,
     },
+    it: {
+      docTitleIdle: 'In riproduzione ♪',
+      moreSettings: 'Altre impostazioni', expandSettings: 'Mostra impostazioni',
+      switchTheme: 'Cambia tema',
+      vinylToggleTitle: 'Vinile / quadrato', vinylToggleAria: 'Vinile/quadrato',
+      fsToggleTitle: 'Immersivo / a tutto schermo', fsToggleAria: 'Modalità immersiva a tutto schermo',
+      themeAuto: 'Atmosfera', themeLight: 'Chiaro', themeTitlePrefix: 'Tema: ', themeTitleSuffix: ' (fai clic per cambiare)',
+      previewAria: 'Anteprima di 30 s', previewTitle: 'Anteprima di 30 secondi (da iTunes)',
+      recentPlays: 'Ascoltati di recente', colTitle: 'Titolo', colAlbum: 'Album', colArtist: 'Artista', col30d: '30 gg',
+      comments: 'Commenti', namePlaceholder: 'Nome', textPlaceholder: 'Scrivi qualcosa…', send: 'Invia',
+      noComments: 'Ancora nessun commento. Scrivi il primo!', anonymous: 'Anonimo',
+      topArtists: 'Top 10 artisti (di sempre)', topArtistsUpdated: t => `Aggiornato · ${t}`,
+      reactionsHint: 'Tocca ❤️ se ti piace',
+      visitorCountTitle: 'Conteggiato una volta per browser; svuotando la cache, con un altro browser o in una finestra privata viene contato di nuovo',
+      poweredByPrefix: 'Realizzato con ', poweredBySuffix: '',
+      justNow: 'adesso', minutesAgo: n => `${n} min fa`, hoursAgo: n => `${n} h fa`, daysAgo: n => `${n} ${n === 1 ? 'giorno' : 'giorni'} fa`,
+      unknownTrack: 'Brano sconosciuto', nowPlaying: 'In riproduzione', paused: 'In pausa',
+      lastPlayed: t => `Ultimo ascolto · ${t}`, recentlyPlayed: 'Ascoltato di recente',
+      updating: 'Aggiornamento…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'un file di testo locale', sourceLX: 'LX Music',
+      coverLyricsVia: s => `Copertina e testo da ${s}`, coverVia: s => `Copertina da ${s}`, lyricsVia: s => `Testo da ${s}`,
+      playedNTimes: n => (n === 1 ? `${n} ascolto negli ultimi 30 giorni` : `${n} ascolti negli ultimi 30 giorni`),
+      hoursMins: (h, m) => `${h} h ${m} min`, minsOnly: m => `${m} min`, approx: '~ ',
+      todayStat: (count, dur) => `Oggi · ${count} ${count === 1 ? 'brano' : 'brani'} · ${dur}`,
+      earlier: 'Prima',
+      nothingPlaying: 'Nessuna riproduzione', quietRightNow: 'Per ora è tutto tranquillo',
+      noSyncedLyrics: 'Nessun testo sincronizzato',
+      notConfigured: 'Pagina non configurata: l’URL deve contenere ?user=<nome utente ListenBrainz>',
+      noListensYet: 'Ancora nessun ascolto',
+      connectingRetry: 'Connessione… nuovo tentativo automatico', connecting: 'Connessione…',
+      pageViews: n => `Visualizzazioni: ${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n} ${n === 1 ? 'ascolto' : 'ascolti'}`,
+    },
     en: {
       docTitleIdle: 'Now Playing ♪',
       moreSettings: 'More settings', expandSettings: 'Expand settings',
@@ -1226,13 +1260,13 @@
     },
   };
   const LANG_KEY = 'npLang';
-  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de'];
-  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de' };
+  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it'];
+  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de', it: 'it' };
   // 浏览器语言标签对到页面语言:繁体看 Hant 或港澳台地区,其余中文算简体;认不出来返回 null。
   function langFor(tag) {
     const l = String(tag || '').toLowerCase();
     if (l === 'zh' || l.startsWith('zh-')) return /-hant\b|-(tw|hk|mo)\b/.test(l) && !/-hans\b/.test(l) ? 'zh-Hant' : 'zh';
-    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'en']) if (l === code || l.startsWith(code + '-')) return code;
+    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'it', 'en']) if (l === code || l.startsWith(code + '-')) return code;
     return null;
   }
   // 记住的选择优先;否则按浏览器首选语言列表逐个找,都不认识就用英文。
