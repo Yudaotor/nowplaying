@@ -710,7 +710,7 @@
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" data-i18n-title="vinylToggleTitle" data-i18n-aria="vinylToggleAria">💿</button>
     <button id="fs-toggle" class="tool-btn" data-i18n-title="fsToggleTitle" data-i18n-aria="fsToggleAria">⛶</button>
-    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português (Brasil)</option><option value="vi">Tiếng Việt</option><option value="ru">Русский</option></select></label>
+    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português (Brasil)</option><option value="vi">Tiếng Việt</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label>
   </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
@@ -824,7 +824,7 @@
   // 语言——不是"忘了重新渲染",是重新渲染了但被自己的去重逻辑拦住了。解法不是到处加
   // "强制重渲染"的旁路,而是把 currentLang 直接拌进签名本身:语言一变,签名天然对不上,
   // 去重逻辑自己就会放行重建,不需要额外维护一套"记得清空签名"的清单。
-  // 俄语按 CLDR 整数规则选词:个位 1 且末两位不是 11 → one,个位 2～4 且末两位不是 12～14 → few,其余 many
+  // 俄语、乌克兰语按 CLDR 整数规则选词(两种语言同一套):个位 1 且末两位不是 11 → one,个位 2～4 且末两位不是 12～14 → few,其余 many
   const ruPlural = (n, one, few, many) => {
     const a = Math.abs(n) % 100, b = a % 10;
     if (b === 1 && a !== 11) return one;
@@ -1206,6 +1206,40 @@
       pageViews: n => `Просмотров: ${n}`,
       artistPlayCount: (name, n) => `${name} · ${n} ${ruPlural(n, 'прослушивание', 'прослушивания', 'прослушиваний')}`,
     },
+    uk: {
+      docTitleIdle: 'Зараз грає ♪',
+      moreSettings: 'Більше параметрів', expandSettings: 'Показати параметри',
+      switchTheme: 'Змінити тему',
+      vinylToggleTitle: 'Платівка / квадрат', vinylToggleAria: 'Платівка/квадрат',
+      fsToggleTitle: 'Занурення / на весь екран', fsToggleAria: 'Режим занурення на весь екран',
+      themeAuto: 'Атмосфера', themeLight: 'Світла', themeTitlePrefix: 'Тема: ', themeTitleSuffix: ' (натисніть, щоб змінити)',
+      previewAria: 'Послухати 30 секунд', previewTitle: 'Послухати 30 секунд (з iTunes)',
+      recentPlays: 'Недавно прослухані', colTitle: 'Назва', colAlbum: 'Альбом', colArtist: 'Виконавець', col30d: '30 днів',
+      comments: 'Коментарі', namePlaceholder: 'Імʼя', textPlaceholder: 'Напишіть щось…', send: 'Надіслати',
+      noComments: 'Коментарів ще немає. Будьте першими!', anonymous: 'Анонім',
+      topArtists: 'Топ-10 виконавців (за весь час)', topArtistsUpdated: t => `Оновлено · ${t}`,
+      reactionsHint: 'Натисніть ❤️, якщо подобається',
+      visitorCountTitle: 'Кожен браузер рахується один раз; після очищення кешу, в іншому браузері чи в приватному вікні відвідування рахується знову',
+      poweredByPrefix: 'Зроблено в ', poweredBySuffix: '',
+      justNow: 'щойно', minutesAgo: n => `${n} хв тому`, hoursAgo: n => `${n} год тому`, daysAgo: n => `${n} ${ruPlural(n, 'день', 'дні', 'днів')} тому`,
+      unknownTrack: 'Невідомий трек', nowPlaying: 'Зараз грає', paused: 'Пауза',
+      lastPlayed: t => `Востаннє відтворено · ${t}`, recentlyPlayed: 'Недавно прослухані',
+      updating: 'Оновлення…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'локальний файл тексту', sourceLX: 'LX Music',
+      coverLyricsVia: s => `Обкладинка й текст: ${s}`, coverVia: s => `Обкладинка: ${s}`, lyricsVia: s => `Текст: ${s}`,
+      playedNTimes: n => `${n} ${ruPlural(n, 'прослуховування', 'прослуховування', 'прослуховувань')} за останні 30 днів`,
+      hoursMins: (h, m) => `${h} год ${m} хв`, minsOnly: m => `${m} хв`, approx: '~ ',
+      todayStat: (count, dur) => `Сьогодні · ${count} ${ruPlural(count, 'трек', 'треки', 'треків')} · ${dur}`,
+      earlier: 'Раніше',
+      nothingPlaying: 'Зараз нічого не грає', quietRightNow: 'Зараз тихо',
+      noSyncedLyrics: 'Немає синхронізованого тексту',
+      notConfigured: 'Сторінку не налаштовано: в URL потрібен ?user=<імʼя користувача ListenBrainz>',
+      noListensYet: 'Прослуховувань ще немає',
+      connectingRetry: 'Зʼєднання… повторимо автоматично', connecting: 'Зʼєднання…',
+      pageViews: n => `Переглядів: ${n}`,
+      artistPlayCount: (name, n) => `${name} · ${n} ${ruPlural(n, 'прослуховування', 'прослуховування', 'прослуховувань')}`,
+    },
     en: {
       docTitleIdle: 'Now Playing ♪',
       moreSettings: 'More settings', expandSettings: 'Expand settings',
@@ -1240,13 +1274,13 @@
     },
   };
   const LANG_KEY = 'npLang';
-  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru'];
-  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt-BR', vi: 'vi', ru: 'ru' };
+  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk'];
+  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt-BR', vi: 'vi', ru: 'ru', uk: 'uk' };
   // 浏览器语言标签对到页面语言:繁体看 Hant 或港澳台地区,其余中文算简体;认不出来返回 null。
   function langFor(tag) {
     const l = String(tag || '').toLowerCase();
     if (l === 'zh' || l.startsWith('zh-')) return /-hant\b|-(tw|hk|mo)\b/.test(l) && !/-hans\b/.test(l) ? 'zh-Hant' : 'zh';
-    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'en']) if (l === code || l.startsWith(code + '-')) return code;
+    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk', 'en']) if (l === code || l.startsWith(code + '-')) return code;
     return null;
   }
   // 记住的选择优先;否则按浏览器首选语言列表逐个找,都不认识就用英文。
