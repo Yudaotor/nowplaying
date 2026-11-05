@@ -60,6 +60,7 @@
   html:lang(zh-Hant) body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", sans-serif; }
   html:lang(ja) body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Helvetica Neue", sans-serif; }
   html:lang(ko) body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Helvetica Neue", sans-serif; }
+  html:lang(th) body { font-family: -apple-system, BlinkMacSystemFont, "Thonburi", "Leelawadee UI", "Noto Sans Thai", sans-serif; }
   /* 🌐 是一个盖着透明下拉框的按钮,点开就是系统的语言列表;16px 免得 iOS 点开时放大页面。 */
   #lang-toggle { position: relative; cursor: pointer; }
   #lang-select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; border: 0; -webkit-appearance: none; appearance: none; }
@@ -809,7 +810,7 @@
     <button id="theme-toggle" class="tool-btn" data-i18n-aria="switchTheme">🌗</button>
     <button id="vinyl-toggle" class="tool-btn" data-i18n-title="vinylToggleTitle" data-i18n-aria="vinylToggleAria">💿</button>
     <button id="fs-toggle" class="tool-btn" data-i18n-title="fsToggleTitle" data-i18n-aria="fsToggleAria">⛶</button>
-    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português (Brasil)</option><option value="vi">Tiếng Việt</option><option value="ru">Русский</option><option value="uk">Українська</option></select></label>
+    <label id="lang-toggle" class="tool-btn" title="Language / 语言">🌐<select id="lang-select" aria-label="Language / 语言"><option value="en">English</option><option value="zh">简体中文</option><option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="pt">Português (Brasil)</option><option value="vi">Tiếng Việt</option><option value="ru">Русский</option><option value="uk">Українська</option><option value="th">ไทย</option></select></label>
   </div>
   <div class="np">
   <div id="art-wrap" class="art-wrap">
@@ -1367,6 +1368,40 @@
       pageViews: n => `Переглядів: ${n}`,
       artistPlayCount: (name, n) => `${name} · ${n} ${ruPlural(n, 'прослуховування', 'прослуховування', 'прослуховувань')}`,
     },
+    th: {
+      docTitleIdle: 'กำลังเล่นอยู่ ♪',
+      moreSettings: 'การตั้งค่าเพิ่มเติม', expandSettings: 'แสดงการตั้งค่า',
+      switchTheme: 'เปลี่ยนชุดรูปแบบ',
+      vinylToggleTitle: 'แผ่นเสียง / สี่เหลี่ยม', vinylToggleAria: 'แผ่นเสียง/สี่เหลี่ยม',
+      fsToggleTitle: 'โหมดดื่มด่ำ / เต็มหน้าจอ', fsToggleAria: 'โหมดดื่มด่ำแบบเต็มหน้าจอ',
+      themeAuto: 'ตามบรรยากาศ', themeLight: 'สว่าง', themeTitlePrefix: 'ชุดรูปแบบ: ', themeTitleSuffix: ' (คลิกเพื่อเปลี่ยน)',
+      previewAria: 'ฟังตัวอย่าง 30 วินาที', previewTitle: 'ฟังตัวอย่าง 30 วินาที (จาก iTunes)',
+      recentPlays: 'เล่นล่าสุด', colTitle: 'ชื่อเพลง', colAlbum: 'อัลบั้ม', colArtist: 'ศิลปิน', col30d: '30 วัน',
+      comments: 'ความคิดเห็น', namePlaceholder: 'ชื่อ', textPlaceholder: 'พูดอะไรสักหน่อย…', send: 'ส่ง',
+      noComments: 'ยังไม่มีความคิดเห็น มาเป็นคนแรกกัน', anonymous: 'ไม่ระบุชื่อ',
+      topArtists: 'ศิลปิน 10 อันดับแรก (ตลอดกาล)', topArtistsUpdated: t => `อัปเดต · ${t}`,
+      reactionsHint: 'แตะ ❤️ ถ้าชอบ',
+      visitorCountTitle: 'นับหนึ่งครั้งต่อเบราว์เซอร์ การล้างแคช เปลี่ยนเบราว์เซอร์ หรือใช้หน้าต่างส่วนตัวจะนับใหม่',
+      poweredByPrefix: 'ขับเคลื่อนโดย ', poweredBySuffix: '',
+      justNow: 'เมื่อสักครู่', minutesAgo: n => `${n} นาทีที่แล้ว`, hoursAgo: n => `${n} ชั่วโมงที่แล้ว`, daysAgo: n => `${n} วันที่แล้ว`,
+      unknownTrack: 'ไม่ทราบชื่อเพลง', nowPlaying: 'กำลังเล่นอยู่', paused: 'หยุดพักอยู่',
+      lastPlayed: t => `เล่นล่าสุด · ${t}`, recentlyPlayed: 'เล่นล่าสุด',
+      updating: 'กำลังอัปเดต…',
+      sourceNetease: 'NetEase Cloud Music', sourceQQ: 'QQ Music', sourceKugou: 'Kugou Music', sourceLRCLIB: 'LRCLIB',
+      sourceKuwo: 'Kuwo Music', sourceMigu: 'Migu Music', sourceSoda: 'Soda Music', sourceLocalFile: 'ไฟล์เนื้อเพลงในเครื่อง', sourceLX: 'LX Music',
+      coverLyricsVia: s => `ภาพหน้าปกและเนื้อเพลงจาก ${s}`, coverVia: s => `ภาพหน้าปกจาก ${s}`, lyricsVia: s => `เนื้อเพลงจาก ${s}`,
+      playedNTimes: n => `เล่น ${n} ครั้งใน 30 วันที่ผ่านมา`,
+      hoursMins: (h, m) => `${h} ชม. ${m} นาที`, minsOnly: m => `${m} นาที`, approx: '~ ',
+      todayStat: (count, dur) => `วันนี้ · ${count} เพลง · ${dur}`,
+      earlier: 'ก่อนหน้านี้',
+      nothingPlaying: 'ไม่มีเพลงที่กำลังเล่น', quietRightNow: 'ตอนนี้เงียบอยู่',
+      noSyncedLyrics: 'ไม่มีเนื้อเพลงที่ตรงจังหวะ',
+      notConfigured: 'ยังไม่ได้ตั้งค่าหน้านี้: URL ต้องมี ?user=<ชื่อผู้ใช้ ListenBrainz>',
+      noListensYet: 'ยังไม่มีประวัติการฟัง',
+      connectingRetry: 'กำลังเชื่อมต่อ… จะลองใหม่อัตโนมัติ', connecting: 'กำลังเชื่อมต่อ…',
+      pageViews: n => `ยอดเข้าชม: ${n}`,
+      artistPlayCount: (name, n) => `${name} · เล่น ${n} ครั้ง`,
+    },
     en: {
       docTitleIdle: 'Now Playing ♪',
       moreSettings: 'More settings', expandSettings: 'Expand settings',
@@ -1403,13 +1438,13 @@
     },
   };
   const LANG_KEY = 'npLang';
-  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk'];
-  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt-BR', vi: 'vi', ru: 'ru', uk: 'uk' };
+  const LANGS = ['en', 'zh', 'zh-Hant', 'ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk', 'th'];
+  const HTML_LANG = { en: 'en', zh: 'zh-CN', 'zh-Hant': 'zh-Hant', ja: 'ja', ko: 'ko', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt-BR', vi: 'vi', ru: 'ru', uk: 'uk', th: 'th' };
   // 浏览器语言标签对到页面语言:繁体看 Hant 或港澳台地区,其余中文算简体;认不出来返回 null。
   function langFor(tag) {
     const l = String(tag || '').toLowerCase();
     if (l === 'zh' || l.startsWith('zh-')) return /-hant\b|-(tw|hk|mo)\b/.test(l) && !/-hans\b/.test(l) ? 'zh-Hant' : 'zh';
-    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk', 'en']) if (l === code || l.startsWith(code + '-')) return code;
+    for (const code of ['ja', 'ko', 'es', 'fr', 'de', 'it', 'pt', 'vi', 'ru', 'uk', 'th', 'en']) if (l === code || l.startsWith(code + '-')) return code;
     return null;
   }
   // 记住的选择优先;否则按浏览器首选语言列表逐个找,都不认识就用英文。
